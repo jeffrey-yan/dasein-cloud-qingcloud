@@ -68,7 +68,7 @@ public class QingCloudRequestBuilder {
 
         requestBuilder.setUri("https://api.qingcloud.com/iaas/");
 
-        parameter("time_stamp", qingCloud.formatIso8601Date(new Date(1447725902400l)));
+        parameter("time_stamp", qingCloud.formatIso8601Date(new Date()));
         parameter("access_key_id", new String(accessKey[0]));
         parameter("version", "1");
         parameter("signature_method", SIGNATURE_ALGORITHM);
