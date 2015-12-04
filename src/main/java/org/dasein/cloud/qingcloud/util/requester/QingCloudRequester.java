@@ -27,6 +27,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.qingcloud.QingCloud;
 import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.util.requester.DaseinRequestExecutor;
+import org.dasein.cloud.util.requester.DaseinResponseHandler;
 import org.dasein.cloud.util.requester.DaseinResponseHandlerWithMapper;
 import org.dasein.cloud.util.requester.streamprocessors.JsonStreamToObjectProcessor;
 
@@ -36,10 +37,15 @@ import org.dasein.cloud.util.requester.streamprocessors.JsonStreamToObjectProces
  * @author Jeffrey Yan
  * @since 2016.02.1
  */
-public class QingCloudRequester<T extends ResponseModel, V> extends DaseinRequestExecutor<V> {
+public class QingCloudRequester<C extends ResponseModel, T> extends DaseinRequestExecutor<T> {
+
+    public QingCloudRequester(QingCloud qingCloud, HttpUriRequest httpUriRequest, Class<T> classType) {
+        super(qingCloud, QingCloudHttpClientBuilderFactory.newHttpClientBuilder(), httpUriRequest,
+                new DaseinResponseHandler(new JsonStreamToObjectProcessor(), classType));
+    }
 
     public QingCloudRequester(QingCloud qingCloud, HttpUriRequest httpUriRequest,
-            QingCloudDriverToCoreMapper<T, V> mapper, Class<T> classType) {
+            QingCloudDriverToCoreMapper<C, T> mapper, Class<C> classType) {
         super(qingCloud, QingCloudHttpClientBuilderFactory.newHttpClientBuilder(), httpUriRequest,
                 new DaseinResponseHandlerWithMapper(new JsonStreamToObjectProcessor(), mapper, classType));
     }

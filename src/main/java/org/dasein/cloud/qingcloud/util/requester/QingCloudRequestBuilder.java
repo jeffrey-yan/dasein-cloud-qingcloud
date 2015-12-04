@@ -114,6 +114,13 @@ public class QingCloudRequestBuilder {
         return this;
     }
 
+    public QingCloudRequestBuilder parameterIfNotNull(final String name, final Object value) {
+        if (value != null) {
+            requestBuilder.addParameter(name, asString(value));
+        }
+        return this;
+    }
+
     public HttpUriRequest build() throws InternalException {
         parameter("signature", signature());
         return requestBuilder.build();
