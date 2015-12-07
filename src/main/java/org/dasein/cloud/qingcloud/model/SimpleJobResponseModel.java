@@ -19,28 +19,19 @@
  *
  */
 
-package org.dasein.cloud.qingcloud.compute.model;
+package org.dasein.cloud.qingcloud.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.dasein.cloud.qingcloud.model.ResponseModel;
 
 /**
- * Created by Jeffrey Yan on 12/4/2015.
+ * Created by Jeffrey Yan on 12/7/2015.
  *
  * @author Jeffrey Yan
  * @since 2016.02.1
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class TerminateInstancesResponse extends ResponseModel {
-
+public class SimpleJobResponseModel extends ResponseModel {
     @JsonProperty("job_id")
     private String jobId;
-
-    @Override
-    public String getAction() {
-        return "TerminateInstancesResponse";
-    }
 
     public String getJobId() {
         return jobId;

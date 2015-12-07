@@ -1,0 +1,97 @@
+[
+  {
+    "zone": "pek1",
+    "instance_types": [
+      {
+        "id": "small_b",
+        "cpu_count": 1,
+        "memory_size_in_mb": 1024
+      },
+      {
+        "id": "small_c",
+        "cpu_count": 1,
+        "memory_size_in_mb": 2048
+      },
+      {
+        "id": "medium_a",
+        "cpu_count": 2,
+        "memory_size_in_mb": 2048
+      },
+      {
+        "id": "medium_b",
+        "cpu_count": 2,
+        "memory_size_in_mb": 4096
+      },
+      {
+        "id": "medium_c",
+        "cpu_count": 2,
+        "memory_size_in_mb": 8192
+      },
+      {
+        "id": "large_a",
+        "cpu_count": 4,
+        "memory_size_in_mb": 4096
+      },
+      {
+        "id": "large_b",
+        "cpu_count": 4,
+        "memory_size_in_mb": 8192
+      },
+      {
+        "id": "large_c",
+        "cpu_count": 4,
+        "memory_size_in_mb": 16384
+      }
+    ]
+  },
+  {
+    "zone": "default",
+    "instance_types": [
+      {
+        "id": "c1m1",
+        "cpu_count": 1,
+        "memory_size_in_mb": 1024
+      },
+      {
+        "id": "c1m2",
+        "cpu_count": 1,
+        "memory_size_in_mb": 2048
+      },
+      {
+        "id": "c1m4",
+        "cpu_count": 1,
+        "memory_size_in_mb": 4096
+      },
+      {
+        "id": "c2m2",
+        "cpu_count": 2,
+        "memory_size_in_mb": 2048
+      },
+      {
+        "id": "c2m4",
+        "cpu_count": 2,
+        "memory_size_in_mb": 4096
+      },
+      {
+        "id": "c2m8",
+        "cpu_count": 2,
+        "memory_size_in_mb": 8192
+      },
+      {
+        "id": "c4m4",
+        "cpu_count": 4,
+        "memory_size_in_mb": 4096
+      },
+      {
+        "id": "c4m8",
+        "cpu_count": 4,
+        "memory_size_in_mb": 8192
+      },
+      {
+        "id": "c4m16",
+        "cpu_count": 4,
+        "memory_size_in_mb": 16384
+      }
+    ]
+  }
+]

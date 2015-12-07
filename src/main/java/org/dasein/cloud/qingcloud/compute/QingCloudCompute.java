@@ -36,7 +36,7 @@ import javax.annotation.Nullable;
  */
 public class QingCloudCompute extends AbstractComputeServices<QingCloud> implements ComputeServices {
 
-    protected QingCloudCompute(QingCloud provider) {
+    public QingCloudCompute(QingCloud provider) {
         super(provider);
     }
 

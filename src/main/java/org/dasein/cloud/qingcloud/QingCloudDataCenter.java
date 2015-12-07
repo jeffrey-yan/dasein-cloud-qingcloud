@@ -132,7 +132,8 @@ public class QingCloudDataCenter extends AbstractDataCenterServices<QingCloud> i
                         protected List<DataCenter> doMapFrom(DescribeZonesResponseModel responseModel) {
                             List<DataCenter> result = new ArrayList<DataCenter>();
                             for (DescribeZonesResponseModel.Zone zone : responseModel.getZones()) {
-                                if (zone.getZoneId().matches("^" + providerRegionId + "[0-9]+$")) {
+                                //if (zone.getZoneId().matches("^" + providerRegionId + "[0-9]+$")) {
+                                if (zone.getZoneId().equals(providerRegionId)) {
                                     boolean active = "active".equals(zone.getStatus());
                                     DataCenter dataCenter = new DataCenter(zone.getZoneId(), zone.getZoneId(),
                                             providerRegionId, active, active);
@@ -180,6 +181,7 @@ public class QingCloudDataCenter extends AbstractDataCenterServices<QingCloud> i
                         @Override
                         protected List<Region> doMapFrom(DescribeZonesResponseModel responseModel) {
                             Set<String> regionIds = new HashSet<String>();
+                            /*
                             Pattern pattern = Pattern.compile("^([A-Za-z]+)([0-9]+)$");
                             for (DescribeZonesResponseModel.Zone zone : responseModel.getZones()) {
                                 Matcher matcher = pattern.matcher(zone.getZoneId());
@@ -187,11 +189,17 @@ public class QingCloudDataCenter extends AbstractDataCenterServices<QingCloud> i
                                     regionIds.add(matcher.group(1));
                                 }
                             }
+                            */
+
+                            for (DescribeZonesResponseModel.Zone zone : responseModel.getZones()) {
+                                regionIds.add(zone.getZoneId());
+                            }
 
                             List<Region> result = new ArrayList<Region>();
                             for(String regionId : regionIds){
                                 Region region = new Region(regionId, regionId, true, true);
-                                region.setJurisdiction("ap".equals(regionId) ? "HK" : "CN");
+                                //region.setJurisdiction("ap".equals(regionId) ? "HK" : "CN");
+                                region.setJurisdiction(regionId.startsWith("ap") ? "HK" : "CN");
                                 result.add(region);
                             }
                             return result;

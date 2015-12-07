@@ -42,11 +42,6 @@ public class RunInstancesResponseModel extends ResponseModel {
     @JsonProperty("job_id")
     private String jobId;
 
-    @Override
-    public String getAction() {
-        return "RunInstancesResponse";
-    }
-
     public List<String> getInstances() {
         return instances;
     }
