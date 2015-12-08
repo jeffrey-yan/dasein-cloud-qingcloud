@@ -1,0 +1,98 @@
+package org.dasein.cloud.qingcloud.model;
+
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+public class DescribeRoutersResponseItemModel {
+
+	@JsonProperty("router_id")
+	private String routerId;
+	@JsonProperty("router_name")
+	private String routerName;
+	@JsonProperty("description")
+	private String description;
+	@JsonProperty("router_type")
+	private Integer routerType;
+	@JsonProperty("private_ip")
+	private String privateIp;
+	@JsonProperty("is_applied")
+	private Integer isApplied;
+	@JsonProperty("status")
+	private String status;
+	@JsonProperty("transition_status")
+	private String transitionStatus;
+	@JsonProperty("create_time")
+	private String create_time;
+	@JsonProperty("status_time")
+	private String status_time;
+	@JsonProperty("eip")
+	private Map eip;
+	
+	public String getRouterId() {
+		return routerId;
+	}
+	public void setRouterId(String routerId) {
+		this.routerId = routerId;
+	}
+	public String getRouterName() {
+		return routerName;
+	}
+	public void setRouterName(String routerName) {
+		this.routerName = routerName;
+	}
+	public String getDescription() {
+		return description;
+	}
+	public void setDescription(String description) {
+		this.description = description;
+	}
+	public Integer getRouterType() {
+		return routerType;
+	}
+	public void setRouterType(Integer routerType) {
+		this.routerType = routerType;
+	}
+	public String getPrivateIp() {
+		return privateIp;
+	}
+	public void setPrivateIp(String privateIp) {
+		this.privateIp = privateIp;
+	}
+	public Integer getIsApplied() {
+		return isApplied;
+	}
+	public void setIsApplied(Integer isApplied) {
+		this.isApplied = isApplied;
+	}
+	public String getStatus() {
+		return status;
+	}
+	public void setStatus(String status) {
+		this.status = status;
+	}
+	public String getTransitionStatus() {
+		return transitionStatus;
+	}
+	public void setTransitionStatus(String transitionStatus) {
+		this.transitionStatus = transitionStatus;
+	}
+	public String getCreate_time() {
+		return create_time;
+	}
+	public void setCreate_time(String create_time) {
+		this.create_time = create_time;
+	}
+	public String getStatus_time() {
+		return status_time;
+	}
+	public void setStatus_time(String status_time) {
+		this.status_time = status_time;
+	}
+	public Map getEip() {
+		return eip;
+	}
+	public void setEip(Map eip) {
+		this.eip = eip;
+	}
+}

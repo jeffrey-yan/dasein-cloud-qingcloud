@@ -48,6 +48,7 @@ import org.dasein.cloud.qingcloud.model.CreateRoutersResponseModel;
 import org.dasein.cloud.qingcloud.model.CreateVxnetsResponseModel;
 import org.dasein.cloud.qingcloud.model.DescribeRouterVxnetsResponseItemModel;
 import org.dasein.cloud.qingcloud.model.DescribeRouterVxnetsResponseModel;
+import org.dasein.cloud.qingcloud.model.DescribeRoutersResponseModel;
 import org.dasein.cloud.qingcloud.model.DescribeVxnetsResponseItemModel;
 import org.dasein.cloud.qingcloud.model.DescribeVxnetsResponseModel;
 import org.dasein.cloud.qingcloud.model.IpAddressResponseModel;
@@ -69,33 +70,67 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 	protected class VlanIdentityGenerator {
 		
 		private String routerId;
-//		private String routerCidr;
-		
-		public VlanIdentityGenerator() {}
+		private String routerCidr;
 		
 		public VlanIdentityGenerator(String vlanId) {
-			if (vlanId != null && vlanId.split(":").length == 2) { //3) {
+			if (vlanId != null && vlanId.split(":").length == 3) {
 				this.routerId = vlanId.split(":")[1];
-//				this.routerCidr = vlanId.split(":")[2];
+				this.routerCidr = vlanId.split(":")[2];
 			}
 		}
 		
-		public VlanIdentityGenerator genFromRouterId(String routerId) { //, String routerCidr) {
-//			this.routerCidr = routerCidr;
-//			this.routerId = routerId;
-			return new VlanIdentityGenerator("vlan:" + routerId);
+		public VlanIdentityGenerator(String routerId, String routerCidr) {
+			this.routerCidr = routerCidr;
+			this.routerId = routerId;
 		}
 		
 		public String getRouterId() {
 			return routerId;
 		}
 		
-//		public String getRouterCidr() {
-//			return routerCidr;
-//		}
+		public String getRouterCidr() {
+			return routerCidr;
+		}
 		
 		public String toString() {
-			return "vlan:" + routerId; // + ":" + routerCidr;
+			return "vlan:" + routerId + ":" + routerCidr;
+		}
+	}
+	
+	protected class SubnetIdentityGenerator {
+		
+		private String subnetId;
+		private String subnetCidr;
+		private String vlanCidr;
+		
+		public SubnetIdentityGenerator(String subnetId) {
+			if (subnetId != null && subnetId.split(":").length == 4) {
+				this.subnetId = subnetId.split(":")[1];
+				this.subnetCidr = subnetId.split(":")[2];
+				this.vlanCidr = subnetId.split(":")[3];
+			}
+		}
+		
+		public SubnetIdentityGenerator(String subnetId, String subnetCidr, String vlanCidr) {
+			this.subnetId = subnetId;
+			this.subnetCidr = subnetCidr;
+			this.vlanCidr = vlanCidr;
+		}
+		
+		public String getSubnetId() {
+			return subnetId;
+		}
+		
+		public String getSubnetCidr() {
+			return subnetCidr;
+		}
+		
+		public String getVlanCidr() {
+			return vlanCidr;
+		}
+		
+		public String toString() {
+			return "subnet:" + subnetId + ":" + subnetCidr;
 		}
 	}
 	
@@ -171,9 +206,10 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 				this.removeSubnet(subnetId);
 			}
 			
-			return Subnet.getInstance(getContext().getAccountNumber(), getContext().getRegionId(), 
-					options.getProviderVlanId(), subnetId, SubnetState.PENDING, options.getName(), 
-					options.getName(), options.getCidr());
+			VlanIdentityGenerator vlanIdentityGenerator = new VlanIdentityGenerator(options.getProviderVlanId());
+			return Subnet.getInstance(getContext().getAccountNumber(), getContext().getRegionId(), options.getProviderVlanId(), 
+					new SubnetIdentityGenerator(subnetId, options.getCidr(), vlanIdentityGenerator.getRouterCidr()).toString(), 
+					SubnetState.PENDING, options.getName(), options.getName(), options.getCidr());
 		} finally {
 			APITrace.end();
 		}
@@ -218,7 +254,7 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 			}
             
 			VLAN vlan = new VLAN();
-            vlan.setProviderVlanId(new VlanIdentityGenerator().genFromRouterId(routerId).toString()); //new VlanIdentityGenerator(vlanId, options.getCidr()).toString());
+            vlan.setProviderVlanId(new VlanIdentityGenerator(routerId, options.getCidr()).toString());
             vlan.setCidr(options.getCidr());
             vlan.setCurrentState(VLANState.PENDING);
             vlan.setName(options.getName());
@@ -273,42 +309,16 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
         			DescribeVxnetsResponseModel.class);
             requester.execute();
             
-            String routerId = describeSubnetResponseMap.get("router_id");
-            if (routerId == null) {
-            	throw new InternalException("No vlan associated with this subnet.");
-            }
-            requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeRouterVxnets");
-            requestBuilder.parameter("router", routerId);
-            requestBuilder.parameter("vxnet", subnetId);
-            requestBuilder.parameter("zone", getProviderDataCenterId());
-            Requester<String> describeRouterVxnetsRequester = new QingCloudRequester<DescribeRouterVxnetsResponseModel, String>(
-                    getProvider(), 
-                    requestBuilder.build(), 
-                    new QingCloudDriverToCoreMapper<DescribeRouterVxnetsResponseModel, String>(){
-        				@Override
-        				protected String doMapFrom(DescribeRouterVxnetsResponseModel responseModel) {
-        					if (responseModel != null && responseModel.getRouterVxnetSet() != null && responseModel.getRouterVxnetSet().size() > 0) {
-        						DescribeRouterVxnetsResponseItemModel item = responseModel.getRouterVxnetSet().get(0);
-        						return item.getIpNetwork();
-        					}
-        					return null;
-        				}
-        			}, 
-        			DescribeRouterVxnetsResponseModel.class);
-            String subnetCidr = describeRouterVxnetsRequester.execute();
-            if (subnetCidr == null) {
-            	throw new InternalException("No cidr found for this subnet.");
-            }
-            
+            SubnetIdentityGenerator subnetIdentityGenerator = new SubnetIdentityGenerator(subnetId);
             return Subnet.getInstance(
             		getContext().getAccountNumber(), 
             		getContext().getRegionId(), 
-            		new VlanIdentityGenerator().genFromRouterId(routerId).toString(), 
+            		new VlanIdentityGenerator(describeSubnetResponseMap.get("router_id"), subnetIdentityGenerator.getVlanCidr()).toString(), 
             		subnetId, 
             		SubnetState.AVAILABLE, 
             		describeSubnetResponseMap.get("vxnet_name"), 
             		describeSubnetResponseMap.get("vxnet_name"), 
-            		subnetCidr);
+            		subnetIdentityGenerator.getSubnetCidr());
 		} finally {
 			APITrace.end();
 		}
@@ -316,8 +326,49 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 
 	@Override
 	public VLAN getVlan(String vlanId) throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		APITrace.begin(getProvider(), "QingCloudVlan.getVlan");
+		try {
+			
+			if (vlanId == null) {
+				throw new InternalException("Invalid vlan id!");
+			}
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeRouters");
+			requestBuilder.parameter("routers.1", new VlanIdentityGenerator(vlanId).getRouterId());
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			Requester<String> requester = new QingCloudRequester<DescribeRoutersResponseModel, String>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    new QingCloudDriverToCoreMapper<DescribeRoutersResponseModel, String>(){
+        				@Override
+        				protected String doMapFrom(DescribeRoutersResponseModel responseModel) {
+        					if (responseModel != null && responseModel.getRouterSet() != null && responseModel.getRouterSet().size() > 0) {
+        						return responseModel.getRouterSet().get(0).getRouterName();
+        					}
+        					return null;
+        				}
+        			}, 
+        			DescribeRoutersResponseModel.class);
+			String vlanName = requester.execute();	
+			if (vlanName == null) {
+				throw new InternalException("Retrieve vlan failed from cloud!");
+			}
+			
+			VlanIdentityGenerator vlanIdentityGenerator = new VlanIdentityGenerator(vlanId);
+			VLAN vlan = new VLAN();
+            vlan.setProviderVlanId(vlanId);
+            vlan.setCidr(vlanIdentityGenerator.getRouterCidr());
+            vlan.setCurrentState(VLANState.PENDING);
+            vlan.setName(vlanName);
+            vlan.setDescription(vlan.getName());
+            vlan.setProviderDataCenterId(getProviderDataCenterId());
+            vlan.setProviderOwnerId(getContext().getAccountNumber());
+            vlan.setProviderRegionId(getContext().getRegionId());
+            vlan.setSupportedTraffic(IPVersion.IPV4);
+            vlan.setVisibleScope(VisibleScope.ACCOUNT_DATACENTER);
+			return vlan;
+		} finally {
+			APITrace.end();
+		}
 	}
 
 	@Override
