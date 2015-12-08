@@ -23,12 +23,14 @@ package org.dasein.cloud.qingcloud.network;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
 import org.apache.http.client.methods.HttpUriRequest;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.VirtualMachine;
+import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.AbstractIpAddressSupport;
 import org.dasein.cloud.network.AddressType;
 import org.dasein.cloud.network.IPAddressCapabilities;
@@ -89,7 +91,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("AssociateEip");
 			requestBuilder.parameter("eip", addressId);
 			requestBuilder.parameter("instance", serverId);
-			requestBuilder.parameter("zone", getContext().getRegionId().toLowerCase());
+			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
             Requester<IpAddressResponseModel> requester = new QingCloudRequester<IpAddressResponseModel, IpAddressResponseModel>(
                     getProvider(), request, IpAddressResponseModel.class);
@@ -115,7 +117,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 				throw new InternalException("Invalid address id!");
 			}
 			
-			final String zone = getContext().getRegionId().toLowerCase();
+			final String zone = getProviderDataCenterId();
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeEips");
 			requestBuilder.parameter("eips.1", addressId);
 			requestBuilder.parameter("zone", zone);
@@ -168,7 +170,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 				return Collections.emptyList();
 			}
 			
-			final String zone = getContext().getRegionId().toLowerCase();
+			final String zone = getProviderDataCenterId();
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeEips");
 			requestBuilder.parameter("zone", zone);
 			HttpUriRequest request = requestBuilder.build();
@@ -217,7 +219,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 				return Collections.emptyList();
 			}
 			
-			final String zone = getContext().getRegionId().toLowerCase();
+			final String zone = getProviderDataCenterId();
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeEips");
 			requestBuilder.parameter("zone", zone);
 			HttpUriRequest request = requestBuilder.build();
@@ -264,7 +266,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ReleaseEips");
 			requestBuilder.parameter("eips.1", addressId);
-			requestBuilder.parameter("zone", getContext().getRegionId().toLowerCase());
+			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
             Requester<IpAddressResponseModel> requester = new QingCloudRequester<IpAddressResponseModel, IpAddressResponseModel>(
                     getProvider(), request, IpAddressResponseModel.class);
@@ -292,7 +294,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			if (ipAddress.getServerId() != null) { 
 				QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DissociateEips");
 				requestBuilder.parameter("eips.1", addressId);
-				requestBuilder.parameter("zone", getContext().getRegionId().toLowerCase());
+				requestBuilder.parameter("zone", getProviderDataCenterId());
 				HttpUriRequest request = requestBuilder.build();
 	            Requester<IpAddressResponseModel> requester = new QingCloudRequester<IpAddressResponseModel, IpAddressResponseModel>(
 	                    getProvider(), request, IpAddressResponseModel.class);
@@ -315,7 +317,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("AllocateEips");
 			requestBuilder.parameter("bandwidth", QingCloudNetworkCommon.DefaultIpAddressBandwidth);
-			requestBuilder.parameter("zone", getContext().getRegionId().toLowerCase());
+			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
             Requester<AllocateEipsResponseModel> requester = new QingCloudRequester<AllocateEipsResponseModel, AllocateEipsResponseModel>(
                     getProvider(), request, AllocateEipsResponseModel.class);
@@ -341,7 +343,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("AllocateEips");
 			requestBuilder.parameter("bandwidth", QingCloudNetworkCommon.DefaultIpAddressBandwidth);
-			requestBuilder.parameter("zone", getContext().getRegionId().toLowerCase());
+			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
             Requester<AllocateEipsResponseModel> requester = new QingCloudRequester<AllocateEipsResponseModel, AllocateEipsResponseModel>(
                     getProvider(), request, AllocateEipsResponseModel.class);
@@ -378,6 +380,16 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			int privatePort, String onServerId) throws InternalException,
 			CloudException {
 		throw new OperationNotSupportedException("Qing cloud doesn't support ip forward!");
+	}
+	
+	private String getProviderDataCenterId() throws InternalException, CloudException {
+		String regionId = getContext().getRegionId();
+        if (regionId == null) {
+            throw new InternalException("No region was set for this request");
+        }
+
+        Iterable<DataCenter> dataCenters = getProvider().getDataCenterServices().listDataCenters(regionId);
+        return dataCenters.iterator().next().getProviderDataCenterId();//each account has one DC in each region
 	}
 
 }
