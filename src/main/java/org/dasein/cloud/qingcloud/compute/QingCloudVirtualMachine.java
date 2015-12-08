@@ -26,15 +26,12 @@ import org.apache.commons.io.IOUtils;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
-import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.VisibleScope;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.Platform;
-import org.dasein.cloud.compute.VMFilterOptions;
 import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineCapabilities;
@@ -44,7 +41,6 @@ import org.dasein.cloud.compute.VirtualMachineProductFilterOptions;
 import org.dasein.cloud.compute.VirtualMachineStatus;
 import org.dasein.cloud.compute.VirtualMachineSupport;
 import org.dasein.cloud.compute.VmState;
-import org.dasein.cloud.compute.VmStatistics;
 import org.dasein.cloud.compute.VmStatus;
 import org.dasein.cloud.compute.VmStatusFilterOptions;
 import org.dasein.cloud.compute.Volume;
@@ -70,13 +66,11 @@ import org.dasein.util.uom.time.Week;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -469,7 +463,6 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
                 .parameter("limit", "999")
                 .parameter("zone", getProvider().getZoneId())
                 .build();
-
 
         Requester<List<VirtualMachineStatus>> requester = new QingCloudRequester<DescribeInstancesResponseModel, List<VirtualMachineStatus>>(
                 getProvider(), request,
