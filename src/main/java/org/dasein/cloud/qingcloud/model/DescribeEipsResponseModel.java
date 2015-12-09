@@ -21,6 +21,7 @@
 package org.dasein.cloud.qingcloud.model;
 
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -44,5 +45,114 @@ public class DescribeEipsResponseModel extends DescribeResponseModel {
 	}
 	public void setEipSet(List<DescribeEipsResponseItemModel> eipSet) {
 		this.eipSet = eipSet;
+	}
+	
+	public static class DescribeEipsResponseItemModel {
+
+		@JsonProperty("eip_id")
+		private String eipId;
+		@JsonProperty("eip_name")
+		private String eipName;
+		@JsonProperty("description")
+		private String description;
+		@JsonProperty("bandwidth")
+		private Integer bandwidth;
+		@JsonProperty("billing_mode")
+		private String billingMode;
+		@JsonProperty("status")
+		private String status;
+		@JsonProperty("transition_status")
+		private String transitionStatus;
+		@JsonProperty("icp_codes")
+		private String icpCodes;
+		@JsonProperty("create_time")
+		private String createTime;
+		@JsonProperty("status_time")
+		private String statusTime;
+		@JsonProperty("resource")
+		private Map resource;
+		@JsonProperty("eip_group")
+		private Map eipGroup;
+		@JsonProperty("eip_addr")
+		private String eipAddress;
+		
+		public String getEipId() {
+			return eipId;
+		}
+		public void setEipId(String eipId) {
+			this.eipId = eipId;
+		}
+		public String getEipName() {
+			return eipName;
+		}
+		public void setEipName(String eipName) {
+			this.eipName = eipName;
+		}
+		public String getDescription() {
+			return description;
+		}
+		public void setDescription(String description) {
+			this.description = description;
+		}
+		public Integer getBandwidth() {
+			return bandwidth;
+		}
+		public void setBandwidth(Integer bandwidth) {
+			this.bandwidth = bandwidth;
+		}
+		public String getBillingMode() {
+			return billingMode;
+		}
+		public void setBillingMode(String billingMode) {
+			this.billingMode = billingMode;
+		}
+		public String getStatus() {
+			return status;
+		}
+		public void setStatus(String status) {
+			this.status = status;
+		}
+		public String getTransitionStatus() {
+			return transitionStatus;
+		}
+		public void setTransitionStatus(String transitionStatus) {
+			this.transitionStatus = transitionStatus;
+		}
+		public String getIcpCodes() {
+			return icpCodes;
+		}
+		public void setIcpCodes(String icpCodes) {
+			this.icpCodes = icpCodes;
+		}
+		public String getCreateTime() {
+			return createTime;
+		}
+		public void setCreateTime(String createTime) {
+			this.createTime = createTime;
+		}
+		public String getStatusTime() {
+			return statusTime;
+		}
+		public void setStatusTime(String statusTime) {
+			this.statusTime = statusTime;
+		}
+		public Map getResource() {
+			return resource;
+		}
+		public void setResource(Map resource) {
+			this.resource = resource;
+		}
+		public Map getEipGroup() {
+			return eipGroup;
+		}
+		public void setEipGroup(Map eipGroup) {
+			this.eipGroup = eipGroup;
+		}
+		public String getEipAddress() {
+			return eipAddress;
+		}
+		public void setEipAddress(String eipAddress) {
+			this.eipAddress = eipAddress;
+		}
 	}
 }

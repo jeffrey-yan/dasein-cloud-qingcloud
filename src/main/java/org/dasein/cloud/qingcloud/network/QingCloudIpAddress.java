@@ -40,9 +40,11 @@ import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.Protocol;
 import org.dasein.cloud.qingcloud.QingCloud;
 import org.dasein.cloud.qingcloud.model.AllocateEipsResponseModel;
-import org.dasein.cloud.qingcloud.model.IpAddressResponseModel;
-import org.dasein.cloud.qingcloud.model.DescribeEipsResponseItemModel;
+import org.dasein.cloud.qingcloud.model.AssociateEipResponseModel;
 import org.dasein.cloud.qingcloud.model.DescribeEipsResponseModel;
+import org.dasein.cloud.qingcloud.model.DissociateEipsResponseModel;
+import org.dasein.cloud.qingcloud.model.ReleaseEipsResponseModel;
+import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
@@ -93,8 +95,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			requestBuilder.parameter("instance", serverId);
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
-            Requester<IpAddressResponseModel> requester = new QingCloudRequester<IpAddressResponseModel, IpAddressResponseModel>(
-                    getProvider(), request, IpAddressResponseModel.class);
+            Requester<AssociateEipResponseModel> requester = new QingCloudRequester<AssociateEipResponseModel, AssociateEipResponseModel>(getProvider(), request, AssociateEipResponseModel.class);
             requester.execute();
 		} finally {
 			APITrace.end();
@@ -130,7 +131,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
         				protected IpAddress doMapFrom(DescribeEipsResponseModel responseModel) {
         					if (responseModel != null && responseModel.getEipSet() != null && responseModel.getEipSet().size() > 0) {
         						IpAddress ipAddress = new IpAddress();
-        						DescribeEipsResponseItemModel eipResponseItem = responseModel.getEipSet().get(0);
+        						DescribeEipsResponseModel.DescribeEipsResponseItemModel eipResponseItem = responseModel.getEipSet().get(0);
         						ipAddress.setAddress(eipResponseItem.getEipAddress());
         						ipAddress.setAddressType(AddressType.PUBLIC);
         						ipAddress.setIpAddressId(eipResponseItem.getEipId());
@@ -182,7 +183,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
         				protected List<IpAddress> doMapFrom(DescribeEipsResponseModel responseModel) {
         					List<IpAddress> ipAddresses = new ArrayList<IpAddress>();
         					if (responseModel != null && responseModel.getEipSet() != null && responseModel.getEipSet().size() > 0) {
-        						for (DescribeEipsResponseItemModel eipResponseItem : responseModel.getEipSet()) {
+        						for (DescribeEipsResponseModel.DescribeEipsResponseItemModel eipResponseItem : responseModel.getEipSet()) {
 	        						IpAddress ipAddress = new IpAddress();
 	        						ipAddress.setAddress(eipResponseItem.getEipAddress());
 	        						ipAddress.setAddressType(AddressType.PUBLIC);
@@ -231,7 +232,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
         				protected List<ResourceStatus> doMapFrom(DescribeEipsResponseModel responseModel) {
         					List<ResourceStatus> statuses = new ArrayList<ResourceStatus>();
         					if (responseModel != null && responseModel.getEipSet() != null && responseModel.getEipSet().size() > 0) {
-        						for (DescribeEipsResponseItemModel eipResponseItem : responseModel.getEipSet()) {
+        						for (DescribeEipsResponseModel.DescribeEipsResponseItemModel eipResponseItem : responseModel.getEipSet()) {
         							statuses.add(new ResourceStatus(eipResponseItem.getEipId(), eipResponseItem.getStatus()));
         						}
         					}
@@ -268,8 +269,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			requestBuilder.parameter("eips.1", addressId);
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
-            Requester<IpAddressResponseModel> requester = new QingCloudRequester<IpAddressResponseModel, IpAddressResponseModel>(
-                    getProvider(), request, IpAddressResponseModel.class);
+            Requester<ReleaseEipsResponseModel> requester = new QingCloudRequester<ReleaseEipsResponseModel, ReleaseEipsResponseModel>(getProvider(), request, ReleaseEipsResponseModel.class);
             requester.execute();
 		} finally {
 			APITrace.end();
@@ -296,8 +296,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 				requestBuilder.parameter("eips.1", addressId);
 				requestBuilder.parameter("zone", getProviderDataCenterId());
 				HttpUriRequest request = requestBuilder.build();
-	            Requester<IpAddressResponseModel> requester = new QingCloudRequester<IpAddressResponseModel, IpAddressResponseModel>(
-	                    getProvider(), request, IpAddressResponseModel.class);
+	            Requester<DissociateEipsResponseModel> requester = new QingCloudRequester<DissociateEipsResponseModel, DissociateEipsResponseModel>(getProvider(), request, DissociateEipsResponseModel.class);
 	            requester.execute();
 			}
 		} finally {

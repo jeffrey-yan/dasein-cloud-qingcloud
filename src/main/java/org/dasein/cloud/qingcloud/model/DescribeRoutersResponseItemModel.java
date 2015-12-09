@@ -1,11 +1,33 @@
 package org.dasein.cloud.qingcloud.model;
 
+import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class DescribeRoutersResponseItemModel {
 
+	public class Vxnet {
+		
+		@JsonProperty("vxnet_id")
+		private String vxnetId;
+		@JsonProperty("nic_id")
+		private String nicId;
+		
+		public String getVxnetId() {
+			return vxnetId;
+		}
+		public void setVxnetId(String vxnetId) {
+			this.vxnetId = vxnetId;
+		}
+		public String getNicId() {
+			return nicId;
+		}
+		public void setNicId(String nicId) {
+			this.nicId = nicId;
+		}
+	}
+	
 	@JsonProperty("router_id")
 	private String routerId;
 	@JsonProperty("router_name")
@@ -28,6 +50,8 @@ public class DescribeRoutersResponseItemModel {
 	private String status_time;
 	@JsonProperty("eip")
 	private Map eip;
+	@JsonProperty("vxnets")
+	private List<Vxnet> vxnets;
 	
 	public String getRouterId() {
 		return routerId;
@@ -94,5 +118,11 @@ public class DescribeRoutersResponseItemModel {
 	}
 	public void setEip(Map eip) {
 		this.eip = eip;
+	}
+	public List<Vxnet> getVxnets() {
+		return vxnets;
+	}
+	public void setVxnets(List<Vxnet> vxnets) {
+		this.vxnets = vxnets;
 	}
 }

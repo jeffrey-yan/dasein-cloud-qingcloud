@@ -20,11 +20,16 @@
  */
 package org.dasein.cloud.qingcloud.network;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ResourceStatus;
@@ -33,7 +38,6 @@ import org.dasein.cloud.VisibleScope;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.AbstractVLANSupport;
 import org.dasein.cloud.network.IPVersion;
-import org.dasein.cloud.network.InternetGateway;
 import org.dasein.cloud.network.Networkable;
 import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.network.SubnetCreateOptions;
@@ -44,14 +48,24 @@ import org.dasein.cloud.network.VLANState;
 import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.network.VlanCreateOptions;
 import org.dasein.cloud.qingcloud.QingCloud;
+import org.dasein.cloud.qingcloud.model.AttachTagsResponseModel;
 import org.dasein.cloud.qingcloud.model.CreateRoutersResponseModel;
+import org.dasein.cloud.qingcloud.model.CreateTagResponseModel;
 import org.dasein.cloud.qingcloud.model.CreateVxnetsResponseModel;
-import org.dasein.cloud.qingcloud.model.DescribeRouterVxnetsResponseItemModel;
+import org.dasein.cloud.qingcloud.model.DeleteVxnetsResponseModel;
 import org.dasein.cloud.qingcloud.model.DescribeRouterVxnetsResponseModel;
+import org.dasein.cloud.qingcloud.model.DescribeRoutersResponseItemModel;
 import org.dasein.cloud.qingcloud.model.DescribeRoutersResponseModel;
-import org.dasein.cloud.qingcloud.model.DescribeVxnetsResponseItemModel;
+import org.dasein.cloud.qingcloud.model.DescribeTagsResponseModel;
+import org.dasein.cloud.qingcloud.model.DescribeTagsResponseModel.DescribeTagsResponseItemModel;
+import org.dasein.cloud.qingcloud.model.DescribeTagsResponseModel.DescribeTagsResponseItemModel.ResourceTagPair;
 import org.dasein.cloud.qingcloud.model.DescribeVxnetsResponseModel;
-import org.dasein.cloud.qingcloud.model.IpAddressResponseModel;
+import org.dasein.cloud.qingcloud.model.JoinRouterResponseModel;
+import org.dasein.cloud.qingcloud.model.JoinVxnetResponseModel;
+import org.dasein.cloud.qingcloud.model.LeaveVxnetResponseModel;
+import org.dasein.cloud.qingcloud.model.ModifyRouterAttributesResponseModel;
+import org.dasein.cloud.qingcloud.model.ModifyTagAttributesResponseModel;
+import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
@@ -67,6 +81,8 @@ import org.dasein.cloud.util.requester.fluent.Requester;
 public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 		VLANSupport {
 
+	private static final Logger stdLogger = QingCloud.getStdLogger(QingCloudVlan.class);
+	
 	protected class VlanIdentityGenerator {
 		
 		private String routerId;
@@ -139,18 +155,6 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 	}
 
 	@Override
-	public String createInternetGateway(String vlanId) throws CloudException,
-			InternalException {
-		APITrace.begin(getProvider(), "QingCloudVlan.createInternetGateway");
-		try {
-			//TODO
-			return null;
-		} finally {
-			APITrace.end();
-		}
-	}
-
-	@Override
 	public Subnet createSubnet(SubnetCreateOptions options)
 			throws CloudException, InternalException {
 		
@@ -187,6 +191,7 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 				throw new InternalException("Create subnet failed!");
 			}
             
+			VlanIdentityGenerator vlanIdentityGenerator = new VlanIdentityGenerator(options.getProviderVlanId());
 			try {
 	            //join router
 	            VLAN vlan = getVlan(options.getProviderVlanId());
@@ -198,23 +203,166 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 	            requestBuilder.parameter("router", new VlanIdentityGenerator(vlan.getProviderVlanId()).getRouterId());
 	            requestBuilder.parameter("ip_network", options.getCidr());
 	            requestBuilder.parameter("zone", getProviderDataCenterId());
-	            Requester<IpAddressResponseModel> joinRouterRequester = new QingCloudRequester<IpAddressResponseModel, IpAddressResponseModel>(
-	                    getProvider(), request, IpAddressResponseModel.class);
+	            Requester<JoinRouterResponseModel> joinRouterRequester = new QingCloudRequester<JoinRouterResponseModel, JoinRouterResponseModel>(getProvider(), request, JoinRouterResponseModel.class);
 	            joinRouterRequester.execute();
 			} catch (CloudException e) {
 				//join failed, remove created subnet
-				this.removeSubnet(subnetId);
+				this.removeSubnet(new SubnetIdentityGenerator(
+						subnetId, 
+						options.getCidr(), 
+						vlanIdentityGenerator.getRouterCidr()).toString());
 			}
 			
-			VlanIdentityGenerator vlanIdentityGenerator = new VlanIdentityGenerator(options.getProviderVlanId());
-			return Subnet.getInstance(getContext().getAccountNumber(), getContext().getRegionId(), options.getProviderVlanId(), 
+			return Subnet.getInstance(
+					getContext().getAccountNumber(), 
+					getContext().getRegionId(), 
+					options.getProviderVlanId(), 
 					new SubnetIdentityGenerator(subnetId, options.getCidr(), vlanIdentityGenerator.getRouterCidr()).toString(), 
-					SubnetState.PENDING, options.getName(), options.getName(), options.getCidr());
+					SubnetState.PENDING, 
+					options.getName(), 
+					options.getName(), 
+					options.getCidr());
 		} finally {
 			APITrace.end();
 		}
 	}
 
+	@Override
+	public VLANCapabilities getCapabilities() throws CloudException,
+			InternalException {
+		return new QingCloudVlanCapabilities(getProvider());
+	}
+
+	@Override
+	public Subnet getSubnet(String subnetId) throws CloudException,
+			InternalException {
+		APITrace.begin(getProvider(), "QingCloudVlan.getSubnet");
+		try {
+			
+			if (subnetId == null) {
+				throw new InternalException("Invalid subnet id");
+			}
+			
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeVxnets");
+			requestBuilder.parameter("vxnets.1", subnetId);
+			requestBuilder.parameter("verbose", 1);
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			final Map<String, String> describeSubnetResponseMap = new HashMap<String, String>();
+			Requester<Void> requester = new QingCloudRequester<DescribeVxnetsResponseModel, Void>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    new QingCloudDriverToCoreMapper<DescribeVxnetsResponseModel, Void>(){
+        				@Override
+        				protected Void doMapFrom(DescribeVxnetsResponseModel responseModel) {
+        					if (responseModel != null && responseModel.getVxnetSet() != null && responseModel.getVxnetSet().size() > 0) {
+        						DescribeVxnetsResponseModel.DescribeVxnetsResponseItemModel item = responseModel.getVxnetSet().get(0);
+        						describeSubnetResponseMap.put("vxnet_name", item.getVxnetName());
+        						if (item.getRouter().get("router_id") != null) {
+        							describeSubnetResponseMap.put("router_id", item.getRouter().get("router_id").toString());
+        						}
+        					}
+        					return null;
+        				}
+        			}, 
+        			DescribeVxnetsResponseModel.class);
+            requester.execute();
+            
+            SubnetIdentityGenerator subnetIdentityGenerator = new SubnetIdentityGenerator(subnetId);
+            Subnet subnet = Subnet.getInstance(
+            		getContext().getAccountNumber(), 
+            		getContext().getRegionId(), 
+            		new VlanIdentityGenerator(describeSubnetResponseMap.get("router_id"), subnetIdentityGenerator.getVlanCidr()).toString(), 
+            		subnetId, 
+            		SubnetState.AVAILABLE, 
+            		describeSubnetResponseMap.get("vxnet_name"), 
+            		describeSubnetResponseMap.get("vxnet_name"), 
+            		subnetIdentityGenerator.getSubnetCidr());
+            
+            List<DescribeTag> subnetTags = describeResourceTags(new SubnetIdentityGenerator(subnetId).getSubnetId());
+			for (DescribeTag tag : subnetTags) {
+				subnet.setTag(tag.getTagName(), tag.getTagDescription());
+			}
+			
+            return subnet;
+		} finally {
+			APITrace.end();
+		}
+	}
+
+	@Override
+	public boolean isSubscribed() throws CloudException, InternalException {
+		return true; //TODO
+	}
+
+	@Override
+	public Iterable<Networkable> listResources(String vlanId)
+			throws CloudException, InternalException {
+		//TODO Firewall, IPAddress, LoadBalancer, LoadBalancerHealthCheck, Subnet, VirtualMachine, Volume
+		return null; 
+	}
+
+	@Override
+	public Iterable<Subnet> listSubnets(String vlanId) throws CloudException,
+			InternalException {
+		APITrace.begin(getProvider(), "QingCloudVlan.listSubnets");
+		try {
+			
+			if (vlanId == null) {
+				throw new InternalException("Invalid vlan id!");
+			}
+			
+			final VlanIdentityGenerator vlanIdentityGenerator = new VlanIdentityGenerator(vlanId);
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeRouterVxnets");
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			requestBuilder.parameter("verbose", 1);
+			requestBuilder.parameter("router", vlanIdentityGenerator.getRouterId());
+			final String ownerId = getContext().getAccountNumber();
+			final String regionId = getContext().getRegionId();
+			Requester<List<Subnet>> describeRouterVxnetsRequester = new QingCloudRequester<DescribeRouterVxnetsResponseModel, List<Subnet>>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    new QingCloudDriverToCoreMapper<DescribeRouterVxnetsResponseModel, List<Subnet>>(){
+        				@Override
+        				protected List<Subnet> doMapFrom(DescribeRouterVxnetsResponseModel responseModel) {
+        					List<Subnet> subnets = new ArrayList<Subnet>();
+        					if (responseModel != null && responseModel.getRouterVxnetSet() != null && responseModel.getRouterVxnetSet().size() > 0) {
+        						for (DescribeRouterVxnetsResponseModel.DescribeRouterVxnetsResponseItemModel routerVxnet : responseModel.getRouterVxnetSet()) {
+        							SubnetIdentityGenerator subnetIdentityGenerator = new SubnetIdentityGenerator(routerVxnet.getVxnetId(), routerVxnet.getIpNetwork(), vlanIdentityGenerator.getRouterCidr());
+        							Subnet subnet = Subnet.getInstance(
+        									ownerId, 
+        									regionId, 
+        									vlanIdentityGenerator.toString(), 
+        									subnetIdentityGenerator.toString(), 
+        									SubnetState.AVAILABLE, 
+        									routerVxnet.getVxnetName(), 
+        									routerVxnet.getVxnetName(), 
+        									routerVxnet.getIpNetwork());
+        							List<DescribeTag> subnetTags;
+									try {
+										subnetTags = describeResourceTags(new SubnetIdentityGenerator(subnet.getProviderSubnetId()).getSubnetId());
+										for (DescribeTag tag : subnetTags) {
+	        								subnet.setTag(tag.getTagName(), tag.getTagDescription());
+	        							}
+										subnets.add(subnet);
+									} catch (InternalException e) {
+										stdLogger.error("retrieve tags for subnet " + subnetIdentityGenerator.getSubnetId() + " failed!", e);
+										throw new RuntimeException(e);
+									} catch (CloudException e) {
+										stdLogger.error("retrieve tags for subnet " + subnetIdentityGenerator.getSubnetId() + " failed!", e);
+										throw new RuntimeException(e);
+									}
+        						}
+        					}
+        					return subnets;
+        				}
+        			}, 
+        			DescribeRouterVxnetsResponseModel.class);
+			return describeRouterVxnetsRequester.execute();
+		} finally {
+			APITrace.end();
+		}
+	}
+	
 	@Override
 	public VLAN createVlan(String cidr, String name, String description,
 			String domainName, String[] dnsServers, String[] ntpServers)
@@ -252,232 +400,260 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 			if (routerId == null) {
 				throw new InternalException("Create vlan failed!");
 			}
-            
-			VLAN vlan = new VLAN();
-            vlan.setProviderVlanId(new VlanIdentityGenerator(routerId, options.getCidr()).toString());
-            vlan.setCidr(options.getCidr());
-            vlan.setCurrentState(VLANState.PENDING);
-            vlan.setName(options.getName());
-            vlan.setDescription(vlan.getName());
-            vlan.setProviderDataCenterId(getProviderDataCenterId());
-            vlan.setProviderOwnerId(getContext().getAccountNumber());
-            vlan.setProviderRegionId(getContext().getRegionId());
-            vlan.setSupportedTraffic(IPVersion.IPV4);
-            vlan.setVisibleScope(VisibleScope.ACCOUNT_DATACENTER);
-            return vlan;
+			
+			requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ModifyRouterAttributes");
+			requestBuilder.parameter("router", routerId);
+			requestBuilder.parameter("description", options.getCidr());
+			Requester<ModifyRouterAttributesResponseModel> modifyRouterAttributesRequester = new QingCloudRequester<ModifyRouterAttributesResponseModel, ModifyRouterAttributesResponseModel>(
+                    getProvider(), requestBuilder.build(), ModifyRouterAttributesResponseModel.class);
+			modifyRouterAttributesRequester.execute();
+			
+			return getVlan(new VlanIdentityGenerator(routerId, options.getCidr()).toString());
 		} finally {
 			APITrace.end();
 		}
 	}
 
 	@Override
-	public VLANCapabilities getCapabilities() throws CloudException,
+	public Iterable<ResourceStatus> listVlanStatus() throws CloudException,
 			InternalException {
-		return new QingCloudVlanCapabilities(getProvider());
-	}
-
-	@Override
-	public Subnet getSubnet(String subnetId) throws CloudException,
-			InternalException {
-		APITrace.begin(getProvider(), "QingCloudVlan.getSubnet");
+		APITrace.begin(getProvider(), "QingCloudVlan.listVlanStatus");
 		try {
-			
-			if (subnetId == null) {
-				throw new InternalException("Invalid subnet id");
+			List<ResourceStatus> statuses = new ArrayList<ResourceStatus>();
+			for (VLAN vlan : listVlans()) {
+				statuses.add(new ResourceStatus(vlan.getProviderVlanId(), vlan.getCurrentState()));
 			}
-			
-			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeVxnets");
-			requestBuilder.parameter("vxnets.1", subnetId);
-			requestBuilder.parameter("zone", getProviderDataCenterId());
-			final Map<String, String> describeSubnetResponseMap = new HashMap<String, String>();
-			Requester<Void> requester = new QingCloudRequester<DescribeVxnetsResponseModel, Void>(
-                    getProvider(), 
-                    requestBuilder.build(), 
-                    new QingCloudDriverToCoreMapper<DescribeVxnetsResponseModel, Void>(){
-        				@Override
-        				protected Void doMapFrom(DescribeVxnetsResponseModel responseModel) {
-        					if (responseModel != null && responseModel.getVxnetSet() != null && responseModel.getVxnetSet().size() > 0) {
-        						DescribeVxnetsResponseItemModel item = responseModel.getVxnetSet().get(0);
-        						describeSubnetResponseMap.put("vxnet_name", item.getVxnetName());
-        						if (item.getRouter().get("router_id") != null) {
-        							describeSubnetResponseMap.put("router_id", item.getRouter().get("router_id").toString());
-        						}
-        					}
-        					return null;
-        				}
-        			}, 
-        			DescribeVxnetsResponseModel.class);
-            requester.execute();
-            
-            SubnetIdentityGenerator subnetIdentityGenerator = new SubnetIdentityGenerator(subnetId);
-            return Subnet.getInstance(
-            		getContext().getAccountNumber(), 
-            		getContext().getRegionId(), 
-            		new VlanIdentityGenerator(describeSubnetResponseMap.get("router_id"), subnetIdentityGenerator.getVlanCidr()).toString(), 
-            		subnetId, 
-            		SubnetState.AVAILABLE, 
-            		describeSubnetResponseMap.get("vxnet_name"), 
-            		describeSubnetResponseMap.get("vxnet_name"), 
-            		subnetIdentityGenerator.getSubnetCidr());
+			return statuses;
 		} finally {
 			APITrace.end();
 		}
 	}
 
 	@Override
-	public VLAN getVlan(String vlanId) throws CloudException, InternalException {
+	public VLAN getVlan(final String vlanId) throws CloudException, InternalException {
 		APITrace.begin(getProvider(), "QingCloudVlan.getVlan");
 		try {
 			
 			if (vlanId == null) {
 				throw new InternalException("Invalid vlan id!");
 			}
+			
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeRouters");
 			requestBuilder.parameter("routers.1", new VlanIdentityGenerator(vlanId).getRouterId());
 			requestBuilder.parameter("zone", getProviderDataCenterId());
-			Requester<String> requester = new QingCloudRequester<DescribeRoutersResponseModel, String>(
+			
+			Requester<VLAN> requester = new QingCloudRequester<DescribeRoutersResponseModel, VLAN>(
                     getProvider(), 
                     requestBuilder.build(), 
-                    new QingCloudDriverToCoreMapper<DescribeRoutersResponseModel, String>(){
+                    new QingCloudDriverToCoreMapper<DescribeRoutersResponseModel, VLAN>(){
         				@Override
-        				protected String doMapFrom(DescribeRoutersResponseModel responseModel) {
+        				protected VLAN doMapFrom(DescribeRoutersResponseModel responseModel) {
         					if (responseModel != null && responseModel.getRouterSet() != null && responseModel.getRouterSet().size() > 0) {
-        						return responseModel.getRouterSet().get(0).getRouterName();
+        						try {
+									return toVlan(responseModel.getRouterSet().get(0));
+								} catch (InternalException e) {
+									stdLogger.error(e.getMessage());
+									throw new RuntimeException(e.getMessage());
+								} catch (CloudException e) {
+									stdLogger.error(e.getMessage());
+									throw new RuntimeException(e.getMessage());
+								}
         					}
         					return null;
         				}
         			}, 
         			DescribeRoutersResponseModel.class);
-			String vlanName = requester.execute();	
-			if (vlanName == null) {
-				throw new InternalException("Retrieve vlan failed from cloud!");
-			}
-			
-			VlanIdentityGenerator vlanIdentityGenerator = new VlanIdentityGenerator(vlanId);
-			VLAN vlan = new VLAN();
-            vlan.setProviderVlanId(vlanId);
-            vlan.setCidr(vlanIdentityGenerator.getRouterCidr());
-            vlan.setCurrentState(VLANState.PENDING);
-            vlan.setName(vlanName);
-            vlan.setDescription(vlan.getName());
-            vlan.setProviderDataCenterId(getProviderDataCenterId());
-            vlan.setProviderOwnerId(getContext().getAccountNumber());
-            vlan.setProviderRegionId(getContext().getRegionId());
-            vlan.setSupportedTraffic(IPVersion.IPV4);
-            vlan.setVisibleScope(VisibleScope.ACCOUNT_DATACENTER);
-			return vlan;
+			return requester.execute();	
+		} finally {
+			APITrace.end();
+		}
+	}
+	
+	
+	
+	@Override
+	public Iterable<VLAN> listVlans() throws CloudException, InternalException {
+		APITrace.begin(getProvider(), "QingCloudVlan.listVlans");
+		try {
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeRouters");
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			Requester<List<VLAN>> requester = new QingCloudRequester<DescribeRoutersResponseModel, List<VLAN>>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    new QingCloudDriverToCoreMapper<DescribeRoutersResponseModel, List<VLAN>>(){
+        				@Override
+        				protected List<VLAN> doMapFrom(DescribeRoutersResponseModel responseModel) {
+        					List<VLAN> vlans = new ArrayList<VLAN>();
+        					if (responseModel != null && responseModel.getRouterSet() != null && responseModel.getRouterSet().size() > 0) {
+        						for (DescribeRoutersResponseItemModel item : responseModel.getRouterSet()) {
+	        						try {
+										vlans.add(toVlan(item));
+									} catch (InternalException e) {
+										stdLogger.error(e);
+										throw new RuntimeException(e);
+									} catch (CloudException e) {
+										stdLogger.error(e);
+										throw new RuntimeException(e);
+									}
+        						}
+        					}
+        					return vlans;
+        				}
+        			}, 
+        			DescribeRoutersResponseModel.class);
+			return requester.execute();
 		} finally {
 			APITrace.end();
 		}
 	}
 
 	@Override
-	public boolean isConnectedViaInternetGateway(String vlanId)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public String getAttachedInternetGatewayId(String vlanId)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public InternetGateway getInternetGatewayById(String gatewayId)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public boolean isSubscribed() throws CloudException, InternalException {
-		return true; //TODO
-	}
-
-	@Override
-	public Iterable<InternetGateway> listInternetGateways(String vlanId)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Iterable<Networkable> listResources(String vlanId)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Iterable<Subnet> listSubnets(String vlanId) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Iterable<ResourceStatus> listVlanStatus() throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Iterable<VLAN> listVlans() throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void removeInternetGateway(String forVlanId) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void removeInternetGatewayById(String id) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void removeInternetGatewayTags(String internetGatewayId, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void removeInternetGatewayTags(String[] internetGatewayIds,
-			Tag... tags) throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void removeNetworkInterface(String nicId) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
 	public void removeSubnet(String providerSubnetId) throws CloudException,
 			InternalException {
+		APITrace.begin(getProvider(), "QingCloudVlan.removeSubnet");
+		try {
+			
+			if (providerSubnetId == null) {
+				throw new InternalException("Invalid subnet id!");
+			}
+			
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeVxnets");
+			requestBuilder.parameter("vxnets.1", new SubnetIdentityGenerator(providerSubnetId).getSubnetId());
+			requestBuilder.parameter("verbose", 1);
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			Requester<List<String>> requester = new QingCloudRequester<DescribeVxnetsResponseModel, List<String>>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    new QingCloudDriverToCoreMapper<DescribeVxnetsResponseModel, List<String>>(){
+        				@Override
+        				protected List<String> doMapFrom(DescribeVxnetsResponseModel responseModel) {
+        					if (responseModel != null && responseModel.getVxnetSet() != null && responseModel.getVxnetSet().size() > 0) {
+        						return responseModel.getVxnetSet().get(0).getInstanceIds();
+        					}
+        					return Collections.emptyList();
+        				}
+        			}, 
+        			DescribeVxnetsResponseModel.class);
+			List<String> instanceIds = requester.execute();
+			
+			if (instanceIds != null && instanceIds.size() > 0) {
+				requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("LeaveVxnet");
+				requestBuilder.parameter("zone", getProviderDataCenterId());
+				for (int i = 0; i < instanceIds.size(); i++) {
+					requestBuilder.parameter("instances." + (i + 1), instanceIds.get(i));
+				}
+				Requester<LeaveVxnetResponseModel> leaveSubnetRequester = new QingCloudRequester<LeaveVxnetResponseModel, LeaveVxnetResponseModel>(
+	                    getProvider(), 
+	                    requestBuilder.build(), 
+	                    LeaveVxnetResponseModel.class);
+				leaveSubnetRequester.execute();
+			}
+			
+			requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DeleteVxnets");
+			requestBuilder.parameter("vxnets.1", new SubnetIdentityGenerator(providerSubnetId).getSubnetId());
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			Requester<String> deleteVxnetsRequester = new QingCloudRequester<DeleteVxnetsResponseModel, String>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    new QingCloudDriverToCoreMapper<DeleteVxnetsResponseModel, String>(){
+        				@Override
+        				protected String doMapFrom(DeleteVxnetsResponseModel responseModel) {
+        					if (responseModel != null && responseModel.getVxnets() != null && responseModel.getVxnets().size() > 0) {
+        						return responseModel.getVxnets().get(0);
+        					}
+        					return null;
+        				}
+        			}, 
+        			DeleteVxnetsResponseModel.class);
+			String successfulDeleteSubnetId = deleteVxnetsRequester.execute();
+			
+			if (successfulDeleteSubnetId == null || !successfulDeleteSubnetId.equals(new SubnetIdentityGenerator(providerSubnetId).getSubnetId())) { 
+				//delete failed, join back vxnet
+				requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("JoinVxnet");
+				requestBuilder.parameter("zone", getProviderDataCenterId());
+				requestBuilder.parameter("vxnet", new SubnetIdentityGenerator(providerSubnetId).getSubnetId());
+				for (int i = 0; i < instanceIds.size(); i++) {
+					requestBuilder.parameter("instances." + (i + 1), instanceIds.get(i));
+				}
+				Requester<JoinVxnetResponseModel> joinSubnetRequester = new QingCloudRequester<JoinVxnetResponseModel, JoinVxnetResponseModel>(
+	                    getProvider(), 
+	                    requestBuilder.build(), 
+	                    JoinVxnetResponseModel.class);
+				joinSubnetRequester.execute();
+			}
+		} finally {
+			APITrace.end();
+		}
+	}
+	
+	@Override
+	public void removeVlan(String vlanId) throws CloudException,
+			InternalException {
 		// TODO Auto-generated method stub
 
 	}
 
+	protected class DescribeTag {
+		
+		private String tagId;
+		private String tagName;
+		private String tagDescription;
+		
+		public String getTagId() {
+			return tagId;
+		}
+		public void setTagId(String tagId) {
+			this.tagId = tagId;
+		}
+		public String getTagName() {
+			return tagName;
+		}
+		public void setTagName(String tagName) {
+			this.tagName = tagName;
+		}
+		public String getTagDescription() {
+			return tagDescription;
+		}
+		public void setTagDescription(String tagDescription) {
+			this.tagDescription = tagDescription;
+		}
+	}
+	
+	public class TagIdentityGenerator {
+		
+		private String tagId;
+		private String tagName;
+		
+		public TagIdentityGenerator(String providerTagId) {
+			if (providerTagId != null && providerTagId.split(":").length == 3) {
+				String[] segments = providerTagId.split(":");
+				this.tagId = segments[1];
+				this.tagName = segments[2];
+			}
+		}
+		
+		public TagIdentityGenerator(String tagId, String tagName) {
+			this.tagId = tagId;
+			this.tagName = tagName;
+		}
+		
+		public String getTagId() {
+			return this.tagId;
+		}
+		
+		public String getTagName() {
+			return this.tagName;
+		}
+		
+		public String toString() {
+			return "tag:" + this.tagId + ":" + this.tagName; 
+		}
+	}
+	
 	@Override
 	public void removeSubnetTags(String subnetId, Tag... tags)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		removeSubnetTags((String[]) Arrays.asList(subnetId).toArray(), tags);
 	}
 
 	@Override
@@ -490,106 +666,82 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 	@Override
 	public void setSubnetTags(String subnetId, Tag... tags)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		setSubnetTags((String[]) Arrays.asList(subnetId).toArray(), tags);
 	}
-
+	
 	@Override
 	public void setSubnetTags(String[] subnetIds, Tag... tags)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
+		
+		final String providerDataCenterId = getProviderDataCenterId();
 
-	}
-
-	@Override
-	public void removeVlan(String vlanId) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void removeVLANTags(String vlanId, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void removeVLANTags(String[] vlanIds, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		removeSubnetTags(subnetIds, tags);
+		
+		List<String> tagIds = new ArrayList<String>();
+		for (Tag tag : tags) {
+			
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("CreateTag");
+			requestBuilder.parameter("tag_name", tag.getKey());
+			requestBuilder.parameter("zone", providerDataCenterId);
+			Requester<String> createTagRequester = new QingCloudRequester<CreateTagResponseModel, String>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    new QingCloudDriverToCoreMapper<CreateTagResponseModel, String>(){
+        				@Override
+        				protected String doMapFrom(CreateTagResponseModel responseModel) {
+        					if (responseModel != null && responseModel.getTagId() != null) {
+        						return responseModel.getTagId();
+        					}
+        					return null;
+        				}
+        			}, 
+        			CreateTagResponseModel.class);
+			String tagId = createTagRequester.execute();
+			
+			requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ModifyTagAttributes");
+			requestBuilder.parameter("tag", tagId);
+			requestBuilder.parameter("description", tag.getValue());
+			requestBuilder.parameter("zone", providerDataCenterId);
+			Requester<ModifyTagAttributesResponseModel> modifyTagAttributesRequester = new QingCloudRequester<ModifyTagAttributesResponseModel, ModifyTagAttributesResponseModel>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    ModifyTagAttributesResponseModel.class);
+			modifyTagAttributesRequester.execute();
+			
+			tagIds.add(tagId);
+		}
+		
+		if (tagIds.size() > 0) { //attach tags to subnet
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("AttachTags");
+			requestBuilder.parameter("zone", providerDataCenterId);
+			for (int i = 0; i < subnetIds.length; i++) {
+				for (int j = 0; j < tagIds.size(); j++) {
+					requestBuilder.parameter("resource_tag_pairs." + (i + j + 1) + ".tag_id", tagIds.get(j));
+					requestBuilder.parameter("resource_tag_pairs." + (i + j + 1) + ".resource_type", "vxnet");
+					requestBuilder.parameter("resource_tag_pairs." + (i + j + 1) + ".resource_id", subnetIds[i]);
+				}
+			}
+			Requester<AttachTagsResponseModel> attachTagsRequester = new QingCloudRequester<AttachTagsResponseModel, AttachTagsResponseModel>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    AttachTagsResponseModel.class);
+			attachTagsRequester.execute();
+		}
 	}
 
 	@Override
 	public void updateSubnetTags(String subnetId, Tag... tags)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		updateSubnetTags((String[]) Arrays.asList(subnetId).toArray(), tags);
 	}
 
 	@Override
 	public void updateSubnetTags(String[] subnetIds, Tag... tags)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void setVLANTags(String vlanId, Tag... tags) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void setVLANTags(String[] vlanIds, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void updateVLANTags(String vlanId, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void updateVLANTags(String[] vlanIds, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void updateInternetGatewayTags(String internetGatewayId, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void updateInternetGatewayTags(String[] internetGatewayIds,
-			Tag... tags) throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void setInternetGatewayTags(String internetGatewayId, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void setInternetGatewayTags(String[] internetGatewayIds, Tag... tags)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		for (String subnetId : subnetIds) {
+			List<DescribeTag> subnetTags = describeResourceTags(subnetId);
+			
+		}
 	}
 
 	@Override
@@ -633,5 +785,55 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 
         Iterable<DataCenter> dataCenters = getProvider().getDataCenterServices().listDataCenters(regionId);
         return dataCenters.iterator().next().getProviderDataCenterId();//each account has one DC in each region
+	}
+	
+	private VLAN toVlan(DescribeRoutersResponseItemModel item) throws InternalException, CloudException {
+		VLAN vlan = new VLAN();
+        vlan.setProviderVlanId(new VlanIdentityGenerator(item.getRouterId(), item.getDescription()).toString());
+        vlan.setCidr(item.getDescription());
+        if (item.getStatus().equals("active")) {
+        	vlan.setCurrentState(VLANState.AVAILABLE);
+        } else {
+        	vlan.setCurrentState(VLANState.PENDING);
+        }
+        vlan.setName(item.getRouterName());
+        vlan.setDescription(item.getDescription());
+        vlan.setProviderDataCenterId(getProviderDataCenterId());
+        vlan.setProviderOwnerId(getContext().getAccountNumber());
+        vlan.setProviderRegionId(getContext().getRegionId());
+        vlan.setSupportedTraffic(IPVersion.IPV4);
+        vlan.setVisibleScope(VisibleScope.ACCOUNT_DATACENTER);
+		return vlan;
+	}
+	
+	private List<DescribeTag> describeResourceTags(final String resourceId) throws InternalException, CloudException {
+		QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeTags");
+		requestBuilder.parameter("zone", getProviderDataCenterId());
+		Requester<List<DescribeTag>> requester = new QingCloudRequester<DescribeTagsResponseModel, List<DescribeTag>>(
+                getProvider(), 
+                requestBuilder.build(), 
+                new QingCloudDriverToCoreMapper<DescribeTagsResponseModel, List<DescribeTag>>(){
+    				@Override
+    				protected List<DescribeTag> doMapFrom(DescribeTagsResponseModel responseModel) {
+    					List<DescribeTag> tags = new ArrayList<DescribeTag>();
+    					if (responseModel != null && responseModel.getTagSet() != null && responseModel.getTagSet().size() > 0) {
+    						for (DescribeTagsResponseItemModel item : responseModel.getTagSet()) {
+    							for (ResourceTagPair pair : item.getResourceTagPairs()) {
+    								if (pair.getResourceId().equals(resourceId)) {
+    									DescribeTag tag = new DescribeTag();
+    									tag.setTagId(item.getTagId());
+    									tag.setTagName(item.getTagName());
+    									tag.setTagDescription(item.getDescription());
+    									tags.add(tag);
+    									break;
+    								}
+    							}
+    						}
+    					}
+    					return tags;
+    				}
+    			}, 
+    			DescribeTagsResponseModel.class);
+		return requester.execute();
 	}
 }

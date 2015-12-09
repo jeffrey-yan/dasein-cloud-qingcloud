@@ -30,7 +30,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @author Jane Wang
  * @since 2016.02.1
  */
-public class AllocateEipsResponseModel extends IpAddressResponseModel {
+public class AllocateEipsResponseModel extends ResponseModel {
 
 	@JsonProperty("eips")
 	private List<String> eips;
@@ -40,5 +40,10 @@ public class AllocateEipsResponseModel extends IpAddressResponseModel {
 	}
 	public void setEips(List<String> eips) {
 		this.eips = eips;
+	}
+	
+	@Override
+	public String getAction() {
+		return "AssociateEips";
 	}
 }
