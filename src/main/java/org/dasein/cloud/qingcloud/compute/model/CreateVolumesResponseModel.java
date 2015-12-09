@@ -23,28 +23,27 @@ package org.dasein.cloud.qingcloud.compute.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
 
 import java.util.List;
 
 /**
- * Created by Jeffrey Yan on 12/4/2015.
+ * Created by Jeffrey Yan on 12/9/2015.
  *
  * @author Jeffrey Yan
  * @since 2016.02.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class RunInstancesResponseModel extends SimpleJobResponseModel {
+public class CreateVolumesResponseModel extends SimpleJobResponseModel {
 
-    @JsonProperty("instances")
-    private List<String> instances;
+    @JsonProperty("volumes")
+    private List<String> volumeIds;
 
-    public List<String> getInstances() {
-        return instances;
+    public List<String> getVolumeIds() {
+        return volumeIds;
     }
 
-    public void setInstances(List<String> instances) {
-        this.instances = instances;
+    public void setVolumeIds(List<String> volumeIds) {
+        this.volumeIds = volumeIds;
     }
 }

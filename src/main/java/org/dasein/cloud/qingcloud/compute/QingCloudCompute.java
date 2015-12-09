@@ -24,6 +24,7 @@ package org.dasein.cloud.qingcloud.compute;
 import org.dasein.cloud.compute.AbstractComputeServices;
 import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.compute.VirtualMachineSupport;
+import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.qingcloud.QingCloud;
 
 import javax.annotation.Nullable;
@@ -41,8 +42,12 @@ public class QingCloudCompute extends AbstractComputeServices<QingCloud> impleme
     }
 
     @Override
-    public @Nullable
-    VirtualMachineSupport getVirtualMachineSupport() {
+    public @Nullable VirtualMachineSupport getVirtualMachineSupport() {
         return new QingCloudVirtualMachine(getProvider());
+    }
+
+    @Override
+    public @Nullable VolumeSupport getVolumeSupport() {
+        return new QingCloudVolume(getProvider());
     }
 }

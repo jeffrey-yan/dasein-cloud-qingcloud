@@ -144,7 +144,7 @@ public class QingCloud extends AbstractCloud {
 
     /*
      * This method will return the QingCloud Zone ID, no matter how region-dc is mapped.
-     * Normally, Zone is same as DC, but region can be different.
+     * Zone is always same as DC, but region can be different.
      */
     public String getZoneId() throws CloudException, InternalException {
         String regionId = getContext().getRegionId();

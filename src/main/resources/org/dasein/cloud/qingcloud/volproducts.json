@@ -1,0 +1,76 @@
+[
+  {
+    "zone": "pek1",
+    "volume_types": [
+      {
+        "id": "0",
+        "name": "Performance",
+        "min_size_in_gb": 10,
+        "max_size_in_gb": 1000
+      },
+      {
+        "id": "1",
+        "name": "Capacity",
+        "min_size_in_gb": 100,
+        "max_size_in_gb": 5000
+      }
+    ]
+  },
+  {
+    "zone": "ap1",
+    "volume_types": [
+      {
+        "id": "0",
+        "name": "Performance",
+        "min_size_in_gb": 10,
+        "max_size_in_gb": 1000
+      },
+      {
+        "id": "1",
+        "name": "Capacity",
+        "min_size_in_gb": 100,
+        "max_size_in_gb": 5000
+      }
+    ]
+  },
+  {
+    "zone": "gd1",
+    "volume_types": [
+      {
+        "id": "0",
+        "name": "Performance",
+        "min_size_in_gb": 10,
+        "max_size_in_gb": 1000
+      },
+      {
+        "id": "2",
+        "name": "Capacity",
+        "min_size_in_gb": 100,
+        "max_size_in_gb": 5000
+      }
+    ]
+  },
+  {
+    "zone": "pek2",
+    "volume_types": [
+      {
+        "id": "0",
+        "name": "Performance",
+        "min_size_in_gb": 10,
+        "max_size_in_gb": 1000
+      },
+      {
+        "id": "2",
+        "name": "Capacity",
+        "min_size_in_gb": 100,
+        "max_size_in_gb": 5000
+      },
+      {
+        "id": "3",
+        "name": "High Performance",
+        "min_size_in_gb": 10,
+        "max_size_in_gb": 1000
+      }
+    ]
+  }
+]

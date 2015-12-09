@@ -284,7 +284,7 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
 
         Cache<VirtualMachineProduct> cache = Cache
                 .getInstance(getProvider(), "vmProducts", VirtualMachineProduct.class, CacheLevel.REGION,
-                        new TimePeriod<Week>(999, TimePeriod.WEEK));
+                        new TimePeriod<Week>(1, TimePeriod.WEEK));
         Iterable<VirtualMachineProduct> products = cache.get(context);
         if (products == null) {
             products = loadProductsDefinition(getProvider().getZoneId());
@@ -298,7 +298,7 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
             InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("/org/dasein/cloud/aws/vmproducts.json");
             JSONArray array = new JSONArray(IOUtils.toString(inputStream));
 
-            Map<String, List<VirtualMachineProduct>> productsOfZonesMap = new HashMap<String, List<VirtualMachineProduct>>();
+            Map<String, List<VirtualMachineProduct>> result = new HashMap<String, List<VirtualMachineProduct>>();
 
             for (int i = 0; i < array.length(); i++) {
                 JSONObject definitionOfZone = array.getJSONObject(i);
@@ -315,13 +315,13 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
                             (new Storage<Megabyte>(instanceType.getInt("memory_size_in_mb"), Storage.MEGABYTE)));
                     productsOfZone.add(product);
                 }
-                productsOfZonesMap.put(definitionOfZone.getString("zone"), productsOfZone);
+                result.put(definitionOfZone.getString("zone"), productsOfZone);
             }
 
-            if (productsOfZonesMap.containsKey(zoneId)) {
-                return productsOfZonesMap.get(zoneId);
+            if (result.containsKey(zoneId)) {
+                return result.get(zoneId);
             } else {
-                return productsOfZonesMap.get("default");
+                return result.get("default");
             }
         } catch (Exception exception) {
             throw new InternalException("Not able to load vm product definition", exception);
@@ -375,78 +375,97 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
 
     @Override
     public @Nonnull Iterable<String> listFirewalls( @Nonnull String vmId ) throws InternalException, CloudException {
-        HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
-                .action("DescribeInstances")
-                .parameter("instances.1", vmId)
-                .parameter("zone", getProvider().getZoneId())
-                .parameter("verbose", "1")
-                .build();
+        APITrace.begin(getProvider(), "VirtualMachine.listFirewalls");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
+                    .action("DescribeInstances")
+                    .parameter("instances.1", vmId)
+                    .parameter("zone", getProvider().getZoneId())
+                    .parameter("verbose", "1").build();
 
-        Requester<String> requester = new QingCloudRequester<DescribeInstancesResponseModel, String>(
-                getProvider(), request,
-                new QingCloudDriverToCoreMapper<DescribeInstancesResponseModel, String>() {
-                    @Override
-                    protected String doMapFrom(DescribeInstancesResponseModel responseModel) {
-                        return responseModel.getInstances().get(0).getSecurityGroup().getSecurityGroupId();
-                    }
-                }, DescribeInstancesResponseModel.class);
+            Requester<String> requester = new QingCloudRequester<DescribeInstancesResponseModel, String>(
+                    getProvider(), request,
+                    new QingCloudDriverToCoreMapper<DescribeInstancesResponseModel, String>() {
+                        @Override
+                        protected String doMapFrom(DescribeInstancesResponseModel responseModel) {
+                            return responseModel.getInstances().get(0).getSecurityGroup().getSecurityGroupId();
+                        }
+                    }, DescribeInstancesResponseModel.class);
 
-        String securityGroupId = requester.execute();
-        return Arrays.asList(securityGroupId);
+            String securityGroupId = requester.execute();
+            return Arrays.asList(securityGroupId);
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull VirtualMachine alterVirtualMachineFirewalls(@Nonnull String virtualMachineId, @Nonnull String[] firewalls) throws InternalException, CloudException{
-        if (firewalls == null || firewalls.length != 1) {
-            throw new InternalException("QingCloud instance can have only one firewall");
+        APITrace.begin(getProvider(), "VirtualMachine.alterVirtualMachineFirewalls");
+        try {
+            if (firewalls == null || firewalls.length != 1) {
+                throw new InternalException("QingCloud instance can have only one firewall");
+            }
+
+            HttpUriRequest request = QingCloudRequestBuilder.post(getProvider())
+                    .action("ApplySecurityGroup")
+                    .parameter("security_group", firewalls[0])
+                    .parameter("instances.1", virtualMachineId)
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(
+                    getProvider(), request, SimpleJobResponseModel.class);
+
+            requester.execute();
+
+            return getVirtualMachine(virtualMachineId);
+        } finally {
+            APITrace.end();
         }
-
-        HttpUriRequest request = QingCloudRequestBuilder.post(getProvider())
-                .action("ApplySecurityGroup")
-                .parameter("security_group", firewalls[0])
-                .parameter("instances.1", virtualMachineId)
-                .parameter("zone", getProvider().getZoneId())
-                .build();
-
-        Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(
-                getProvider(), request, SimpleJobResponseModel.class);
-
-        requester.execute();
-
-        return getVirtualMachine(virtualMachineId);
     }
 
     @Override
     public @Nullable VirtualMachine getVirtualMachine( @Nonnull String vmId ) throws InternalException, CloudException {
-        HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
-                .action("DescribeInstances")
-                .parameter("instances.1", vmId)
-                .parameter("zone", getProvider().getZoneId())
-                .build();
+        APITrace.begin(getProvider(), "VirtualMachine.getVirtualMachine");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
+                    .action("DescribeInstances")
+                    .parameter("instances.1", vmId)
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
 
-        Requester<List<VirtualMachine>> requester = new QingCloudRequester<DescribeInstancesResponseModel, List<VirtualMachine>>(
-                getProvider(), request, new VirtualMachinesMapper(), DescribeInstancesResponseModel.class);
+            Requester<List<VirtualMachine>> requester = new QingCloudRequester<DescribeInstancesResponseModel, List<VirtualMachine>>(
+                    getProvider(), request, new VirtualMachinesMapper(), DescribeInstancesResponseModel.class);
 
-        List<VirtualMachine> result = requester.execute();
-        if (result.size() > 0) {
-            return result.get(0);
-        } else {
-            return null;
+            List<VirtualMachine> result = requester.execute();
+            if (result.size() > 0) {
+                return result.get(0);
+            } else {
+                return null;
+            }
+        } finally {
+            APITrace.end();
         }
     }
 
     @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
-        HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
-                .action("DescribeInstances")
-                .parameter("limit", "999")
-                .parameter("zone", getProvider().getZoneId())
-                .build();
+        APITrace.begin(getProvider(), "VirtualMachine.listVirtualMachines");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
+                    .action("DescribeInstances")
+                    .parameter("limit", "999")
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
 
-        Requester<List<VirtualMachine>> requester = new QingCloudRequester<DescribeInstancesResponseModel, List<VirtualMachine>>(
-                getProvider(), request, new VirtualMachinesMapper(), DescribeInstancesResponseModel.class);
+            Requester<List<VirtualMachine>> requester = new QingCloudRequester<DescribeInstancesResponseModel, List<VirtualMachine>>(
+                    getProvider(), request, new VirtualMachinesMapper(), DescribeInstancesResponseModel.class);
 
-        return requester.execute();
+            return requester.execute();
+        } finally {
+            APITrace.end();
+        }
     }
 
     //TODO VM statistics
@@ -458,33 +477,38 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
 
     @Override
     public @Nullable Iterable<VirtualMachineStatus> getVMStatus( @Nullable final VmStatusFilterOptions filterOptions ) throws InternalException, CloudException {
-        HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
-                .action("DescribeInstances")
-                .parameter("limit", "999")
-                .parameter("zone", getProvider().getZoneId())
-                .build();
+        APITrace.begin(getProvider(), "VirtualMachine.getVMStatus");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
+                    .action("DescribeInstances")
+                    .parameter("limit", "999")
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
 
-        Requester<List<VirtualMachineStatus>> requester = new QingCloudRequester<DescribeInstancesResponseModel, List<VirtualMachineStatus>>(
-                getProvider(), request,
-                new QingCloudDriverToCoreMapper<DescribeInstancesResponseModel, List<VirtualMachineStatus>>() {
-                    @Override
-                    protected List<VirtualMachineStatus> doMapFrom(DescribeInstancesResponseModel responseModel) {
-                        List<VirtualMachineStatus> result = new ArrayList<VirtualMachineStatus>();
-                        for (DescribeInstancesResponseModel.Instance instance : responseModel.getInstances()) {
-                            VirtualMachineStatus virtualMachineStatus = new VirtualMachineStatus();
-                            virtualMachineStatus.setProviderHostStatus(getHostStatus());
-                            virtualMachineStatus.setProviderVmStatus(getVmStatus());
-                            virtualMachineStatus.setProviderVirtualMachineId(instance.getInstanceId());
+            Requester<List<VirtualMachineStatus>> requester = new QingCloudRequester<DescribeInstancesResponseModel, List<VirtualMachineStatus>>(
+                    getProvider(), request,
+                    new QingCloudDriverToCoreMapper<DescribeInstancesResponseModel, List<VirtualMachineStatus>>() {
+                        @Override
+                        protected List<VirtualMachineStatus> doMapFrom(DescribeInstancesResponseModel responseModel) {
+                            List<VirtualMachineStatus> result = new ArrayList<VirtualMachineStatus>();
+                            for (DescribeInstancesResponseModel.Instance instance : responseModel.getInstances()) {
+                                VirtualMachineStatus virtualMachineStatus = new VirtualMachineStatus();
+                                virtualMachineStatus.setProviderHostStatus(getHostStatus());
+                                virtualMachineStatus.setProviderVmStatus(getVmStatus());
+                                virtualMachineStatus.setProviderVirtualMachineId(instance.getInstanceId());
 
-                            if (filterOptions.matches(virtualMachineStatus)) {
-                                result.add(virtualMachineStatus);
+                                if (filterOptions.matches(virtualMachineStatus)) {
+                                    result.add(virtualMachineStatus);
+                                }
                             }
+                            return result;
                         }
-                        return result;
-                    }
-                }, DescribeInstancesResponseModel.class);
+                    }, DescribeInstancesResponseModel.class);
 
-        return requester.execute();
+            return requester.execute();
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -521,7 +545,7 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
                     virtualMachine.setPrivateAddresses(collectPrivateIpAddresses(instance.getVxnets()));
                     //TODO, private subnet ids not set, because only one allowed for dasein model
                     virtualMachine.setPublicAddresses(new RawAddress(instance.getEip().getEipAddr(), IPVersion.IPV4));
-                    virtualMachine.setCurrentState(mapVmState(instance.getStatus()));
+                    virtualMachine.setCurrentState(mapVmState(instance.getStatus(), instance.getTransitionStatus()));
                     virtualMachine.setStateReasonMessage(instance.getTransitionStatus());
                     virtualMachine.setName(instance.getInstanceName());
                     virtualMachine.setCreationTimestamp(
@@ -564,7 +588,11 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
             }
         }
 
-        private VmState mapVmState(String state) {
+        private VmState mapVmState(String state, String transitionState) {
+            if (transitionState != null && !transitionState.equals("")) {
+                return VmState.PENDING;
+            }
+
             if ("pending".equals(state)) {
                 return VmState.PENDING;
             } else if ("running".equals(state)) {
