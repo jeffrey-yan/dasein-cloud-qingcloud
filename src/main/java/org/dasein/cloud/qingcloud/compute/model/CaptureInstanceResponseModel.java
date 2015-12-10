@@ -19,47 +19,28 @@
  *
  */
 
-package org.dasein.cloud.qingcloud.model;
+package org.dasein.cloud.qingcloud.compute.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
 
 /**
- * Created by Jeffrey Yan on 11/12/2015.
+ * Created by Jeffrey Yan on 12/10/2015.
  *
  * @author Jeffrey Yan
  * @since 2016.02.1
  */
-public class ResponseModel {
-    @JsonProperty("action")
-    private String action;
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class CaptureInstanceResponseModel extends SimpleJobResponseModel {
+    @JsonProperty("image_id")
+    private String imageId;
 
-    @JsonProperty("ret_code")
-    private int retCode;
-
-    @JsonProperty("message")
-    private String errorMessage;
-
-    public String getAction() {
-        return action;
+    public String getImageId() {
+        return imageId;
     }
 
-    public void setAction(String action) {
-        this.action = action;
-    }
-
-    public int getRetCode() {
-        return retCode;
-    }
-
-    public void setRetCode(int retCode) {
-        this.retCode = retCode;
-    }
-
-    public String getErrorMessage() {
-        return errorMessage;
-    }
-
-    public void setErrorMessage(String errorMessage) {
-        this.errorMessage = errorMessage;
+    public void setImageId(String imageId) {
+        this.imageId = imageId;
     }
 }

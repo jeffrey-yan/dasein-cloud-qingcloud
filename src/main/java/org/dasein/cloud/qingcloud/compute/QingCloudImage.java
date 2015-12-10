@@ -21,22 +21,43 @@
 
 package org.dasein.cloud.qingcloud.compute;
 
+import org.apache.http.client.methods.HttpUriRequest;
 import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.Tag;
+import org.dasein.cloud.VisibleScope;
 import org.dasein.cloud.compute.AbstractImageSupport;
+import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageCapabilities;
+import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.ImageCreateOptions;
 import org.dasein.cloud.compute.ImageFilterOptions;
 import org.dasein.cloud.compute.MachineImage;
+import org.dasein.cloud.compute.MachineImageFormat;
+import org.dasein.cloud.compute.MachineImageState;
 import org.dasein.cloud.compute.MachineImageSupport;
+import org.dasein.cloud.compute.MachineImageType;
+import org.dasein.cloud.compute.Platform;
+import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.qingcloud.QingCloud;
+import org.dasein.cloud.qingcloud.compute.model.CaptureInstanceResponseModel;
+import org.dasein.cloud.qingcloud.compute.model.DescribeImagesResponseModel;
+import org.dasein.cloud.qingcloud.model.ResponseModel;
+import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
+import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
+import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
+import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
+import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.requester.fluent.Requester;
+import org.dasein.util.CalendarWrapper;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Created by Jeffrey Yan on 12/9/2015.
@@ -62,50 +83,215 @@ public class QingCloudImage extends AbstractImageSupport<QingCloud> implements M
 
     @Override
     protected MachineImage capture(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image capture is not currently implemented in " + getProvider().getCloudName());
+        APITrace.begin(getProvider(), "Image.capture");
+        try {
+            VirtualMachine vm = getProvider().getComputeServices().getVirtualMachineSupport().getVirtualMachine(options.getVirtualMachineId());
+            if( vm == null ) {
+                throw new CloudException("Virtual machine not found: " + options.getVirtualMachineId());
+            }
+
+            if( !getCapabilities().canImage(vm.getCurrentState()) ) {
+                throw new CloudException("Server must be stopped before making an image - current state: " + vm.getCurrentState());
+            }
+
+            if( task != null ) {
+                task.setStartTime(System.currentTimeMillis());
+            }
+
+            HttpUriRequest request = QingCloudRequestBuilder.post(getProvider())
+                    .action("CaptureInstance")
+                    .parameter("instance", options.getVirtualMachineId())
+                    .parameter("image_name", options.getName())
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<CaptureInstanceResponseModel> requester = new QingCloudRequester<CaptureInstanceResponseModel, CaptureInstanceResponseModel>(
+                    getProvider(), request, CaptureInstanceResponseModel.class);
+
+            CaptureInstanceResponseModel responseModel = requester.execute();
+
+            MachineImage image = getImage(responseModel.getImageId());
+
+            //TODO, handle options.getReboot() option
+            if( task != null ) {
+                task.completeWithResult(image);
+            }
+            return image;
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "Image.remove");
+        try {
+            if (checkState) {
+                long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 30L);
 
+                while (timeout > System.currentTimeMillis()) {
+                    try {
+                        MachineImage img = getMachineImage(providerImageId);
+
+                        if (img == null || MachineImageState.DELETED.equals(img.getCurrentState())) {
+                            return;
+                        }
+                        if (MachineImageState.ACTIVE.equals(img.getCurrentState())) {
+                            break;
+                        }
+                    } catch (Throwable ignore) {
+                        // ignore
+                    }
+                    try {
+                        Thread.sleep(15000L);
+                    } catch (InterruptedException ignore) {
+                    }
+                }
+            }
+
+            HttpUriRequest request = QingCloudRequestBuilder.post(getProvider())
+                    .action("DeleteImages")
+                    .parameter("images.1", providerImageId)
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(
+                    getProvider(), request, SimpleJobResponseModel.class);
+
+            requester.execute();
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Nullable
     @Override
     public MachineImage getImage(@Nonnull String providerImageId) throws CloudException, InternalException {
-        return null;
+        APITrace.begin(getProvider(), "Image.getImage");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
+                    .action("DescribeImages")
+                    .parameter("images.1", providerImageId)
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<List<MachineImage>> requester = new QingCloudRequester<DescribeImagesResponseModel, List<MachineImage>>(
+                    getProvider(), request, new ImagesMapper(), DescribeImagesResponseModel.class);
+
+            List<MachineImage> result = requester.execute();
+            if (result.size() > 0) {
+                return result.get(0);
+            } else {
+                return null;
+            }
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Nonnull
     @Override
-    public Iterable<MachineImage> listImages(@Nullable ImageFilterOptions options)
-            throws CloudException, InternalException {
-        return null;
+    public Iterable<MachineImage> listImages(@Nullable ImageFilterOptions options) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "Image.listImages");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
+                    .action("DescribeImages")
+                    .parameter("visibility", "private")
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<List<MachineImage>> requester = new QingCloudRequester<DescribeImagesResponseModel, List<MachineImage>>(
+                    getProvider(), request, new ImagesMapper(), DescribeImagesResponseModel.class);
+
+            List<MachineImage> result = new ArrayList<MachineImage>();
+
+            for (MachineImage machineImage : requester.execute()) {
+                if (options.matches(machineImage)) {
+                    result.add(machineImage);
+                }
+            }
+
+            return result;
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull Iterable<MachineImage> searchPublicImages(@Nonnull ImageFilterOptions options) throws CloudException, InternalException {
-        return Collections.emptyList();
+        APITrace.begin(getProvider(), "Image.searchPublicImages");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
+                    .action("DescribeImages")
+                    .parameter("visibility", "public")
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<List<MachineImage>> requester = new QingCloudRequester<DescribeImagesResponseModel, List<MachineImage>>(
+                    getProvider(), request, new ImagesMapper(), DescribeImagesResponseModel.class);
+
+            List<MachineImage> result = new ArrayList<MachineImage>();
+
+            for (MachineImage machineImage : requester.execute()) {
+                if (options.matches(machineImage)) {
+                    result.add(machineImage);
+                }
+            }
+
+            return result;
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public void addImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Support for image sharing is not currently implemented in " + getProvider().getCloudName());
+        APITrace.begin(getProvider(), "Image.addImageShare");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.post(getProvider())
+                    .action("GrantImageToUsers")
+                    .parameter("image", providerImageId)
+                    .parameter("users.1", accountNumber)
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(getProvider(),
+                    request, ResponseModel.class);
+
+            requester.execute();
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull Iterable<String> listShares(@Nonnull String providerImageId) throws CloudException, InternalException {
-        return Collections.emptyList();
+        throw new OperationNotSupportedException("QingCloud doesn't have API to list all shares");
     }
 
     @Override
     public void removeAllImageShares(@Nonnull String providerImageId) throws CloudException, InternalException {
-        // NO-OP (does not error even when not supported)
+        throw new OperationNotSupportedException("QingCloud doesn't have API to remove all shares");
     }
 
     @Override
     public void removeImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not currently implemented in " + getProvider().getCloudName());
+        APITrace.begin(getProvider(), "Image.removeImageShare");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.post(getProvider())
+                    .action("RevokeImageFromUsers")
+                    .parameter("image", providerImageId)
+                    .parameter("users.1", accountNumber)
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(getProvider(),
+                    request, ResponseModel.class);
+
+            requester.execute();
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -118,4 +304,74 @@ public class QingCloudImage extends AbstractImageSupport<QingCloud> implements M
         //TODO
     }
 
+    private class ImagesMapper extends QingCloudDriverToCoreMapper<DescribeImagesResponseModel, List<MachineImage>> {
+
+        @Override
+        protected List<MachineImage> doMapFrom(DescribeImagesResponseModel responseModel) {
+            try {
+                List<MachineImage> images = new ArrayList<MachineImage>();
+
+                for(DescribeImagesResponseModel.Image imageModel : responseModel.getImages()) {
+                    String ownerId = mapOwner(imageModel.getProvider(), imageModel.getOwner());
+                    String regionId = getContext().getRegionId();
+                    MachineImageState imageState = mapImageState(imageModel.getStatus(),
+                            imageModel.getTransitionStatus());
+                    Architecture architecture = mapArchitecture(imageModel.getProcessorType());
+                    Platform platform = Platform.guess(imageModel.getOsFamily());
+
+                    MachineImage machineImage = MachineImage.getInstance(ownerId, regionId, imageModel.getImageId(),
+                            ImageClass.MACHINE, imageState, imageModel.getImageName(), imageModel.getDescription(),
+                            architecture, platform);
+                    machineImage.constrainedTo(getProvider().getZoneId());
+                    machineImage.createdAt(getProvider().parseIso8601Date(imageModel.getCreateTime()).getTime());
+                    machineImage.setMinimumDiskSizeGb(imageModel.getSize());
+
+                    machineImage.withStorageFormat(MachineImageFormat.VHD);
+                    machineImage.withType(MachineImageType.VOLUME);
+                    machineImage.withVisibleScope(VisibleScope.ACCOUNT_DATACENTER);
+                    //TODO, set tags
+
+                    images.add(machineImage);
+                }
+
+                return images;
+            } catch (Exception exception) {
+                throw new RuntimeException(exception);
+            }
+        }
+
+        private Architecture mapArchitecture(String architecture) {
+            if("64bit".equals(architecture)) {
+                return Architecture.I64;
+            } else {
+                return Architecture.I32;
+            }
+        }
+
+        private String mapOwner(String provider, String owner) {
+            if ("system".equals(provider)) {
+                return provider;
+            } else { //self or may be other
+                return owner;
+            }
+        }
+
+        private MachineImageState mapImageState(String state, String transitionState) {
+            if (transitionState != null && !transitionState.equals("")) {
+                return MachineImageState.PENDING;
+            }
+
+            if ("pending".equals(state)) {
+                return MachineImageState.PENDING;
+            } else if ("available".equals(state)) {
+                return MachineImageState.ACTIVE;
+            } else if ("deprecated".equals(state) || "suspended".equals(state)) {
+                return MachineImageState.ERROR;
+            } else if ("deleted".equals(state) || "ceased".equals(state)) {
+                return MachineImageState.DELETED;
+            } else {
+                return null;
+            }
+        }
+    }
 }
