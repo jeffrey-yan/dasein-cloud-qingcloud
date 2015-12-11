@@ -36,6 +36,7 @@ import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.qingcloud.QingCloud;
+import org.dasein.cloud.qingcloud.compute.model.CreateVolumeFromSnapshotResponseModel;
 import org.dasein.cloud.qingcloud.compute.model.CreateVolumesResponseModel;
 import org.dasein.cloud.qingcloud.compute.model.DescribeVolumesResponseModel;
 import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
@@ -86,19 +87,33 @@ public class QingCloudVolume extends AbstractVolumeSupport<QingCloud> implements
     public @Nonnull String createVolume(@Nonnull VolumeCreateOptions options) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "Volume.createVolume");
         try {
-            HttpUriRequest request = QingCloudRequestBuilder.put(getProvider())
-                    .action("CreateVolumes")
-                    .parameter("size", options.getVolumeSize().intValue())
-                    .parameter("volume_name", options.getName())
-                    .parameter("volume_type", options.getVolumeProductId())
-                    .parameter("count", "1")
-                    .parameter("zone", getProvider().getZoneId())
-                    .build();
+            if (options.getSnapshotId() != null && !options.getSnapshotId().isEmpty()) {
+                HttpUriRequest request = QingCloudRequestBuilder.put(getProvider())
+                        .action("CreateVolumeFromSnapshot")
+                        .parameter("snapshot", options.getSnapshotId())
+                        .parameter("volume_name", options.getName())
+                        .parameter("zone", getProvider().getZoneId())
+                        .build();
 
-            Requester<CreateVolumesResponseModel> requester = new QingCloudRequester<CreateVolumesResponseModel, CreateVolumesResponseModel>(
-                    getProvider(), request, CreateVolumesResponseModel.class);
+                Requester<CreateVolumeFromSnapshotResponseModel> requester = new QingCloudRequester<CreateVolumeFromSnapshotResponseModel, CreateVolumeFromSnapshotResponseModel>(
+                        getProvider(), request, CreateVolumeFromSnapshotResponseModel.class);
+                //TODO, handle tags
+                return requester.execute().getVolumeId();
+            } else {
+                HttpUriRequest request = QingCloudRequestBuilder.put(getProvider())
+                        .action("CreateVolumes")
+                        .parameter("size", options.getVolumeSize().intValue())
+                        .parameter("volume_name", options.getName())
+                        .parameter("volume_type", options.getVolumeProductId())
+                        .parameter("count", "1")
+                        .parameter("zone", getProvider().getZoneId())
+                        .build();
 
-            return requester.execute().getVolumeIds().get(0);
+                Requester<CreateVolumesResponseModel> requester = new QingCloudRequester<CreateVolumesResponseModel, CreateVolumesResponseModel>(
+                        getProvider(), request, CreateVolumesResponseModel.class);
+                //TODO, handle tags
+                return requester.execute().getVolumeIds().get(0);
+            }
         } finally {
             APITrace.end();
         }
@@ -196,6 +211,7 @@ public class QingCloudVolume extends AbstractVolumeSupport<QingCloud> implements
         try {
             HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
                     .action("DescribeVolumes")
+                    .parameter("limit", "999")
                     .parameter("zone", getProvider().getZoneId())
                     .build();
 

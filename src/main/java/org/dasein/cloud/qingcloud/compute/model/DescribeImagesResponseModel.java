@@ -48,52 +48,52 @@ public class DescribeImagesResponseModel extends DescribeResponseModel {
     }
 
     public static class Image {
-        @JsonProperty("image_set")
+        @JsonProperty("status")
         private String status;
 
-        @JsonProperty("image_set")
+        @JsonProperty("processor_type")
         private String processorType;
 
-        @JsonProperty("image_set")
+        @JsonProperty("image_id")
         private String imageId;
 
-        @JsonProperty("image_set")
-        private String subCode;
+        @JsonProperty("sub_code")
+        private int subCode;
 
-        @JsonProperty("image_set")
+        @JsonProperty("transition_status")
         private String transitionStatus;
 
-        @JsonProperty("image_set")
+        @JsonProperty("recommended_type")
         private String recommendedType;
 
-        @JsonProperty("image_set")
+        @JsonProperty("image_name")
         private String imageName;
 
-        @JsonProperty("image_set")
+        @JsonProperty("visibility")
         private String visibility;
 
-        @JsonProperty("image_set")
+        @JsonProperty("platform")
         private String platform;
 
-        @JsonProperty("image_set")
+        @JsonProperty("create_time")
         private String createTime;
 
-        @JsonProperty("image_set")
+        @JsonProperty("os_family")
         private String osFamily;
 
-        @JsonProperty("image_set")
+        @JsonProperty("provider")
         private String provider;
 
-        @JsonProperty("image_set")
+        @JsonProperty("owner")
         private String owner;
 
-        @JsonProperty("image_set")
+        @JsonProperty("status_time")
         private String statusTime;
 
-        @JsonProperty("image_set")
+        @JsonProperty("size")
         private int size;
 
-        @JsonProperty("image_set")
+        @JsonProperty("description")
         private String description;
 
         public String getStatus() {
@@ -120,11 +120,11 @@ public class DescribeImagesResponseModel extends DescribeResponseModel {
             this.imageId = imageId;
         }
 
-        public String getSubCode() {
+        public int getSubCode() {
             return subCode;
         }
 
-        public void setSubCode(String subCode) {
+        public void setSubCode(int subCode) {
             this.subCode = subCode;
         }
 

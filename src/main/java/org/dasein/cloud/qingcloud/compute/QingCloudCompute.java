@@ -24,6 +24,7 @@ package org.dasein.cloud.qingcloud.compute;
 import org.dasein.cloud.compute.AbstractComputeServices;
 import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.compute.MachineImageSupport;
+import org.dasein.cloud.compute.SnapshotSupport;
 import org.dasein.cloud.compute.VirtualMachineSupport;
 import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.qingcloud.QingCloud;
@@ -55,5 +56,10 @@ public class QingCloudCompute extends AbstractComputeServices<QingCloud> impleme
     @Override
     public @Nullable MachineImageSupport getImageSupport() {
         return new QingCloudImage(getProvider());
+    }
+
+    @Override
+    public @Nullable SnapshotSupport getSnapshotSupport() {
+        return new QingCloudSnapshot(getProvider());
     }
 }

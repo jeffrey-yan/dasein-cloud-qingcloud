@@ -165,7 +165,7 @@ public class QingCloudVirtualMachine extends AbstractVMSupport<QingCloud> implem
                     getProvider(), request, RunInstancesResponseModel.class);
 
             RunInstancesResponseModel runInstancesResponseModel = requester.execute();
-
+            //TODO, handle tags
             return getVirtualMachine(runInstancesResponseModel.getInstances().get(0));
         } finally {
             APITrace.end();

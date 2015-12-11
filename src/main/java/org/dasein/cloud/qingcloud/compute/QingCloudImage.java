@@ -98,6 +98,7 @@ public class QingCloudImage extends AbstractImageSupport<QingCloud> implements M
                 task.setStartTime(System.currentTimeMillis());
             }
 
+            //Note, Qing Cloud does support capture image from a snapshot, but Dasein Cloud doesn't support it
             HttpUriRequest request = QingCloudRequestBuilder.post(getProvider())
                     .action("CaptureInstance")
                     .parameter("instance", options.getVirtualMachineId())
@@ -112,7 +113,7 @@ public class QingCloudImage extends AbstractImageSupport<QingCloud> implements M
 
             MachineImage image = getImage(responseModel.getImageId());
 
-            //TODO, handle options.getReboot() option
+            //TODO, handle options.getReboot(), and tags
             if( task != null ) {
                 task.completeWithResult(image);
             }
@@ -197,6 +198,7 @@ public class QingCloudImage extends AbstractImageSupport<QingCloud> implements M
             HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
                     .action("DescribeImages")
                     .parameter("visibility", "private")
+                    .parameter("limit", "999")
                     .parameter("zone", getProvider().getZoneId())
                     .build();
 
@@ -224,6 +226,7 @@ public class QingCloudImage extends AbstractImageSupport<QingCloud> implements M
             HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
                     .action("DescribeImages")
                     .parameter("visibility", "public")
+                    .parameter("limit", "999")
                     .parameter("zone", getProvider().getZoneId())
                     .build();
 
