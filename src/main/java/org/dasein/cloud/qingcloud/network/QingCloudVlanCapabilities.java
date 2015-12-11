@@ -176,7 +176,7 @@ public class QingCloudVlanCapabilities extends AbstractCapabilities<QingCloud>
 	@Override
 	public NamingConstraints getVlanNamingConstraints() throws CloudException,
 			InternalException {
-		return null;
+		return NamingConstraints.getAlphaNumeric(1, 255);
 	}
 
 }
