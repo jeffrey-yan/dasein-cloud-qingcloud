@@ -43,6 +43,7 @@ import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.qingcloud.QingCloud;
 import org.dasein.cloud.qingcloud.compute.model.CaptureInstanceResponseModel;
+import org.dasein.cloud.qingcloud.compute.model.DescribeImageUsersResponseModel;
 import org.dasein.cloud.qingcloud.compute.model.DescribeImagesResponseModel;
 import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
@@ -57,6 +58,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -266,12 +268,60 @@ public class QingCloudImage extends AbstractImageSupport<QingCloud> implements M
 
     @Override
     public @Nonnull Iterable<String> listShares(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("QingCloud doesn't have API to list all shares");
+        APITrace.begin(getProvider(), "Image.listShares");
+        try {
+            HttpUriRequest request = QingCloudRequestBuilder.get(getProvider())
+                    .action("DescribeImageUsers")
+                    .parameter("image_id", providerImageId)
+                    .parameter("offset", "0")
+                    .parameter("limit", "999")
+                    .parameter("zone", getProvider().getZoneId())
+                    .build();
+
+            Requester<List<String>> requester = new QingCloudRequester<DescribeImageUsersResponseModel, List<String>>(
+                    getProvider(), request,
+                    new QingCloudDriverToCoreMapper<DescribeImageUsersResponseModel, List<String>>() {
+                        @Override
+                        protected List<String> doMapFrom(DescribeImageUsersResponseModel responseModel) {
+                            List<String> result = new ArrayList<String>();
+                            for (DescribeImageUsersResponseModel.ImageUser imageUser : responseModel.getImageUsers()) {
+                                result.add(imageUser.getUser().getUserId());
+                            }
+                            return result;
+                        }
+                    }, DescribeImageUsersResponseModel.class);
+
+
+            return requester.execute();
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public void removeAllImageShares(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("QingCloud doesn't have API to remove all shares");
+        APITrace.begin(getProvider(), "Image.removeAllImageShares");
+        try {
+            Iterable<String> shares = listShares(providerImageId);
+
+            QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.post(getProvider())
+                    .action("RevokeImageFromUsers")
+                    .parameter("image", providerImageId)
+                    .parameter("zone", getProvider().getZoneId());
+
+            Iterator<String> sharesIterator = shares.iterator();
+            int index = 1;
+            while (sharesIterator.hasNext()) {
+                requestBuilder.parameter("users." + (index++), sharesIterator.next());
+            }
+
+            Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(getProvider(),
+                    requestBuilder.build(), ResponseModel.class);
+
+            requester.execute();
+        } finally {
+            APITrace.end();
+        }
     }
 
     @Override

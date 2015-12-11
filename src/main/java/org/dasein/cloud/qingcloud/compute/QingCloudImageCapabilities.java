@@ -131,7 +131,7 @@ public class QingCloudImageCapabilities extends AbstractCapabilities<QingCloud> 
 
     @Override
     public boolean supportsImageSharing() throws CloudException, InternalException {
-        return false; //TODO, should support, but QingCloud doesn't have listShares API, so not support dasein completely
+        return true;
     }
 
     @Override
