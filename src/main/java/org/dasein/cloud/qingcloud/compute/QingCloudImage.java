@@ -25,7 +25,6 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.VisibleScope;
 import org.dasein.cloud.compute.AbstractImageSupport;
@@ -57,7 +56,6 @@ import org.dasein.util.CalendarWrapper;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
