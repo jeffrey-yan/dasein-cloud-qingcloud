@@ -111,7 +111,7 @@ public class QingCloudVlanCapabilities extends AbstractCapabilities<QingCloud>
 
 	@Override
 	public String getProviderTermForVlan(Locale locale) {
-		return ""; //TODO
+		return "Router";
 	}
 
 	@Override
@@ -128,7 +128,7 @@ public class QingCloudVlanCapabilities extends AbstractCapabilities<QingCloud>
 
 	@Override
 	public VisibleScope getVLANVisibleScope() {
-		return VisibleScope.ACCOUNT_REGION; //TODO
+		return VisibleScope.ACCOUNT_DATACENTER;
 	}
 
 	@Override
@@ -176,7 +176,7 @@ public class QingCloudVlanCapabilities extends AbstractCapabilities<QingCloud>
 	@Override
 	public NamingConstraints getVlanNamingConstraints() throws CloudException,
 			InternalException {
-		return null; //TODO
+		return null;
 	}
 
 }

@@ -53,7 +53,7 @@ public class QingCloudIpAddressCapabilities extends
 	@Override
 	public Requirement identifyVlanForVlanIPRequirement()
 			throws CloudException, InternalException {
-		return Requirement.NONE;
+		return Requirement.REQUIRED;
 	}
 
 	@Override
@@ -119,7 +119,7 @@ public class QingCloudIpAddressCapabilities extends
 	@Override
 	public boolean supportsVLANAddresses(IPVersion ofVersion)
 			throws InternalException, CloudException {
-		return false;
+		return true;
 	}
 
 }

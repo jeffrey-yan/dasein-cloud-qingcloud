@@ -75,8 +75,7 @@ public class QingCloudNetwork extends AbstractNetworkServices<QingCloud>
 
 	@Override
 	public VLANSupport getVlanSupport() {
-		// TODO Auto-generated method stub
-		return null;
+		return new QingCloudVlan(getProvider());
 	}
 
 	@Override
