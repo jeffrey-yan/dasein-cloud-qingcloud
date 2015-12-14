@@ -38,11 +38,6 @@ public class DescribeZonesResponseModel extends DescribeResponseModel {
     @JsonProperty("zone_set")
     private List<Zone> zones;
 
-    @Override
-    public String getAction() {
-        return "DescribeZonesResponse";
-    }
-
     public List<Zone> getZones() {
         return zones;
     }

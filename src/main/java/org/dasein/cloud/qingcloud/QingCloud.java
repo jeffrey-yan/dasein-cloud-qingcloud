@@ -23,11 +23,14 @@ package org.dasein.cloud.qingcloud;
 
 import org.apache.log4j.Logger;
 import org.dasein.cloud.AbstractCloud;
+import org.dasein.cloud.CloudException;
 import org.dasein.cloud.ContextRequirements;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.dc.DataCenterServices;
 import org.dasein.cloud.dc.Region;
+import org.dasein.cloud.qingcloud.compute.QingCloudCompute;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -65,7 +68,7 @@ public class QingCloud extends AbstractCloud {
     static private @Nonnull Logger getLogger(@Nonnull Class<?> cls, @Nonnull String type) {
         String pkg = getLastItem(cls.getPackage().getName());
 
-        if( pkg.equals("qingcloud") ) {
+        if( pkg.equals("org") ) {
             pkg = "";
         }
         else {
@@ -139,12 +142,31 @@ public class QingCloud extends AbstractCloud {
         }
     }
 
+    /*
+     * This method will return the QingCloud Zone ID, no matter how region-dc is mapped.
+     * Zone is always same as DC, but region can be different.
+     */
+    public String getZoneId() throws CloudException, InternalException {
+        String regionId = getContext().getRegionId();
+        if (regionId == null) {
+            throw new InternalException("No region was set for this request");
+        }
+        return regionId;
+        //Iterable<DataCenter> dataCenters = getDataCenterServices().listDataCenters(regionId);
+        //return dataCenters.iterator().next().getProviderDataCenterId();//each account has one DC in each region
+    }
+
     @Nonnull
     @Override
     public DataCenterServices getDataCenterServices() {
         return new QingCloudDataCenter(this);
     }
 
+    @Override
+    @Nullable
+    public ComputeServices getComputeServices() {
+        return new QingCloudCompute(this);
+    }
 
     public String formatIso8601Date(Date date) {
         SimpleDateFormat df = new SimpleDateFormat(ISO8601_DATE_FORMAT);

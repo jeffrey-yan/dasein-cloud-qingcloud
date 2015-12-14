@@ -29,14 +29,23 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @author Jeffrey Yan
  * @since 2016.02.1
  */
-public abstract class ResponseModel {
+public class ResponseModel {
+    @JsonProperty("action")
+    private String action;
+
     @JsonProperty("ret_code")
     private int retCode;
 
     @JsonProperty("message")
     private String errorMessage;
 
-    public abstract String getAction();
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
 
     public int getRetCode() {
         return retCode;
