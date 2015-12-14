@@ -34,11 +34,6 @@ public class DeleteVxnetsResponseModel extends ResponseModel {
 
 	@JsonProperty("vxnets")
 	private List<String> vxnets;
-	
-	@Override
-	public String getAction() {
-		return "DeleteVxnets";
-	}
 
 	public List<String> getVxnets() {
 		return vxnets;

@@ -34,11 +34,6 @@ public class DeleteTagsResponseModel extends ResponseModel {
 
 	@JsonProperty("tags")
 	private List<String> tags;
-	
-	@Override
-	public String getAction() {
-		return "DeleteTags";
-	}
 
 	public List<String> getTags() {
 		return tags;

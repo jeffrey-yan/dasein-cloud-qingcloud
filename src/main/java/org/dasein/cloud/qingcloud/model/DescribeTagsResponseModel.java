@@ -34,12 +34,7 @@ public class DescribeTagsResponseModel extends DescribeResponseModel {
 
 	@JsonProperty("tag_set")
 	private List<DescribeTagsResponseItemModel> tagSet;
-	
-	@Override
-	public String getAction() {
-		return "DescribeTags";
-	}
-	
+
 	public List<DescribeTagsResponseItemModel> getTagSet() {
 		return tagSet;
 	}

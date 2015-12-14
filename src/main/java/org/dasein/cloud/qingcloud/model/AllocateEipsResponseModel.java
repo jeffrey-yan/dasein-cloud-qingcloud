@@ -41,9 +41,5 @@ public class AllocateEipsResponseModel extends ResponseModel {
 	public void setEips(List<String> eips) {
 		this.eips = eips;
 	}
-	
-	@Override
-	public String getAction() {
-		return "AssociateEips";
-	}
+
 }

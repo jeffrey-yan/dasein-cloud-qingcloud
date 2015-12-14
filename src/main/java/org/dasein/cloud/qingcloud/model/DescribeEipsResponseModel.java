@@ -35,11 +35,7 @@ public class DescribeEipsResponseModel extends DescribeResponseModel {
 
 	@JsonProperty("eip_set")
 	private List<DescribeEipsResponseItemModel> eipSet;
-	
-	@Override
-	public String getAction() {
-		return "DescribeEips";
-	}
+
 	public List<DescribeEipsResponseItemModel> getEipSet() {
 		return eipSet;
 	}

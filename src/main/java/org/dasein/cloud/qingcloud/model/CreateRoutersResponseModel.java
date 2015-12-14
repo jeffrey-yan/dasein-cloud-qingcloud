@@ -34,11 +34,6 @@ public class CreateRoutersResponseModel extends ResponseModel {
 
 	@JsonProperty("routers")
 	private List<String> routers;
-	
-	@Override
-	public String getAction() {
-		return "CreateRoutersResponse";
-	}
 
 	public List<String> getRouters() {
 		return routers;

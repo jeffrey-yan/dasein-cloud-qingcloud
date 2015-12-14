@@ -34,11 +34,6 @@ public class DescribeRouterVxnetsResponseModel extends DescribeResponseModel {
 
 	@JsonProperty("router_vxnet_set")
 	private List<DescribeRouterVxnetsResponseItemModel> routerVxnetSet;
-	
-	@Override
-	public String getAction() {
-		return "DescribeRouterVxnets";
-	}
 
 	public List<DescribeRouterVxnetsResponseItemModel> getRouterVxnetSet() {
 		return routerVxnetSet;

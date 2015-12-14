@@ -34,11 +34,6 @@ public class CreateVxnetsResponseModel extends ResponseModel {
 
 	@JsonProperty("vxnets")
 	private List<String> vxnets;
-	
-	@Override
-	public String getAction() {
-		return "CreateVxnets";
-	}
 
 	public List<String> getVxnets() {
 		return vxnets;

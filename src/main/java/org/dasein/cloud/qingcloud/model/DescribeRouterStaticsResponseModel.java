@@ -35,11 +35,6 @@ public class DescribeRouterStaticsResponseModel extends ResponseModel {
 	@JsonProperty("router_static_set")
 	private List<DescribeRouterStaticsResponseItemModel> routerStaticSet;
 	
-	@Override
-	public String getAction() {
-		return "DescribeRouterStatics";
-	}
-
 	public List<DescribeRouterStaticsResponseItemModel> getRouterStaticSet() {
 		return routerStaticSet;
 	}

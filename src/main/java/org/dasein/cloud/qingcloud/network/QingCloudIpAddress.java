@@ -23,7 +23,9 @@ package org.dasein.cloud.qingcloud.network;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.log4j.Logger;
@@ -43,11 +45,10 @@ import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.Protocol;
 import org.dasein.cloud.qingcloud.QingCloud;
 import org.dasein.cloud.qingcloud.model.AllocateEipsResponseModel;
-import org.dasein.cloud.qingcloud.model.AssociateEipResponseModel;
 import org.dasein.cloud.qingcloud.model.DescribeEipsResponseModel;
-import org.dasein.cloud.qingcloud.model.DissociateEipsResponseModel;
-import org.dasein.cloud.qingcloud.model.ModifyRouterAttributesResponseModel;
-import org.dasein.cloud.qingcloud.model.ReleaseEipsResponseModel;
+import org.dasein.cloud.qingcloud.model.DescribeEipsResponseModel.DescribeEipsResponseItemModel;
+import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
+import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
@@ -107,7 +108,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			requestBuilder.parameter("instance", serverId);
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
-            Requester<AssociateEipResponseModel> requester = new QingCloudRequester<AssociateEipResponseModel, AssociateEipResponseModel>(getProvider(), request, AssociateEipResponseModel.class);
+            Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(getProvider(), request, SimpleJobResponseModel.class);
             requester.execute();
 		} finally {
 			APITrace.end();
@@ -133,57 +134,21 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			final String zone = getProviderDataCenterId();
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeEips");
 			requestBuilder.parameter("eips.1", addressId);
+			requestBuilder.parameter("verbose", 1);
 			requestBuilder.parameter("zone", zone);
 			HttpUriRequest request = requestBuilder.build();
-            Requester<IpAddress> requester = new QingCloudRequester<DescribeEipsResponseModel, IpAddress>(
+            Requester<List<IpAddress>> requester = new QingCloudRequester<DescribeEipsResponseModel, List<IpAddress>>(
                     getProvider(), 
                     request, 
-                    new QingCloudDriverToCoreMapper<DescribeEipsResponseModel, IpAddress>(){
-        				@Override
-        				protected IpAddress doMapFrom(DescribeEipsResponseModel responseModel) {
-        					if (responseModel != null && responseModel.getEipSet() != null && responseModel.getEipSet().size() > 0) {
-        						IpAddress ipAddress = new IpAddress();
-        						DescribeEipsResponseModel.DescribeEipsResponseItemModel eipResponseItem = responseModel.getEipSet().get(0);
-        						ipAddress.setAddress(eipResponseItem.getEipAddress());
-        						ipAddress.setAddressType(AddressType.PUBLIC);
-        						ipAddress.setIpAddressId(eipResponseItem.getEipId());
-        						ipAddress.setRegionId(zone);
-        						ipAddress.setVersion(IPVersion.IPV4);
-        						if (eipResponseItem.getResource() != null && eipResponseItem.getResource().size() > 0) {
-        							if (eipResponseItem.getResource().get("resource_type").equals("instance")) {
-        								ipAddress.setServerId(eipResponseItem.getResource().get("resource_id").toString());
-        							} else if (eipResponseItem.getResource().get("resource_type").equals("loadbalancer")) {
-        								ipAddress.setProviderLoadBalancerId(eipResponseItem.getResource().get("resource_id").toString());
-        							} else if (eipResponseItem.getResource().get("resource_type").equals("router")) {
-        								try {
-											String routerCidr = getVlanCidrByRouterId(eipResponseItem.getResource().get("resource_id").toString());
-											ipAddress.setProviderVlanId(new QingCloudVlan.IdentityGenerator(
-													eipResponseItem.getResource().get("resource_id").toString(), 
-													routerCidr).toString());
-        								} catch (InternalException e) {
-        									stdLogger.error("retrieve router '" + 
-        											eipResponseItem.getResource().get("resource_id").toString() + 
-        											"' failed", e);
-        									throw new RuntimeException("retrieve router '" + 
-        											eipResponseItem.getResource().get("resource_id").toString() + 
-        											"' cidr failed!", e);
-										} catch (CloudException e) {
-											stdLogger.error("retrieve router '" + 
-        											eipResponseItem.getResource().get("resource_id").toString() + 
-        											"' failed", e);
-        									throw new RuntimeException("retrieve router '" + 
-        											eipResponseItem.getResource().get("resource_id").toString() + 
-        											"' cidr failed!", e);
-										}
-        							}
-        						}
-        						return ipAddress;
-        					}
-        					return null;
-        				}
-        			}, 
+                    new IpAddressesMapper(), 
                     DescribeEipsResponseModel.class);
-            return requester.execute();
+            List<IpAddress> ipAddresses = requester.execute();
+            
+            if (ipAddresses != null && ipAddresses.size() > 0) {
+            	return ipAddresses.get(0);
+            } else {
+            	return null;
+            }
 		} finally {
 			APITrace.end();
 		}
@@ -212,48 +177,23 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
             Requester<List<IpAddress>> requester = new QingCloudRequester<DescribeEipsResponseModel, List<IpAddress>>(
                     getProvider(), 
                     request, 
-                    new QingCloudDriverToCoreMapper<DescribeEipsResponseModel, List<IpAddress>>(){
-        				@Override
-        				protected List<IpAddress> doMapFrom(DescribeEipsResponseModel responseModel) {
-        					List<IpAddress> ipAddresses = new ArrayList<IpAddress>();
-        					if (responseModel != null && responseModel.getEipSet() != null && responseModel.getEipSet().size() > 0) {
-        						for (DescribeEipsResponseModel.DescribeEipsResponseItemModel eipResponseItem : responseModel.getEipSet()) {
-	        						IpAddress ipAddress = new IpAddress();
-	        						ipAddress.setAddress(eipResponseItem.getEipAddress());
-	        						ipAddress.setAddressType(AddressType.PUBLIC);
-	        						ipAddress.setIpAddressId(eipResponseItem.getEipId());
-	        						ipAddress.setRegionId(zone);
-	        						ipAddress.setVersion(IPVersion.IPV4);
-	        						if (eipResponseItem.getResource() != null && eipResponseItem.getResource().size() > 0) {
-	        							if (eipResponseItem.getResource().get("resource_type").equals("instance")) {
-	        								ipAddress.setServerId(eipResponseItem.getResource().get("resource_id").toString());
-	        							} else if (eipResponseItem.getResource().get("resource_type").equals("loadbalancer")) {
-	        								ipAddress.setProviderLoadBalancerId(eipResponseItem.getResource().get("resource_id").toString());
-	        							} else if (eipResponseItem.getResource().get("resource_type").equals("router")) {
-	        								try {
-												String routerCidr = getVlanCidrByRouterId(eipResponseItem.getResource().get("resource_id").toString());
-												ipAddress.setProviderVlanId(new QingCloudVlan.IdentityGenerator(
-														eipResponseItem.getResource().get("resource_id").toString(), 
-														routerCidr).toString());
-	        								} catch (InternalException e) {
-												throw new RuntimeException("retrieve router cidr failed!");
-											} catch (CloudException e) {
-												throw new RuntimeException("retrieve router cidr failed!");
-											}
-	        							}
-	        							if (!unassignedOnly) {
-	        								ipAddresses.add(ipAddress);
-	        							}
-	        						} else {
-	        							ipAddresses.add(ipAddress);
-	        						}
-        						}
-        					}
-        					return ipAddresses;
-        				}
-        			}, 
+                    new IpAddressesMapper(), 
                     DescribeEipsResponseModel.class);
-            return requester.execute();
+            
+            if (unassignedOnly) {
+	            List<IpAddress> ipAddresses = new ArrayList<IpAddress>();
+	            for (IpAddress ipAddress : requester.execute()) {
+	            	if (ipAddress.getServerId() == null && 
+	            			ipAddress.getProviderLoadBalancerId() == null && 
+	            			ipAddress.getProviderVlanId() == null) {
+	            		ipAddresses.add(ipAddress);
+	            	}
+	            }
+	            return ipAddresses;
+            } else {
+            	return requester.execute();
+            }
+            
 		} finally {
 			APITrace.end();
 		}
@@ -273,23 +213,19 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeEips");
 			requestBuilder.parameter("zone", zone);
 			HttpUriRequest request = requestBuilder.build();
-            Requester<List<ResourceStatus>> requester = new QingCloudRequester<DescribeEipsResponseModel, List<ResourceStatus>>(
+			IpAddressesMapper mapper = new IpAddressesMapper();
+			Requester<List<IpAddress>> requester = new QingCloudRequester<DescribeEipsResponseModel, List<IpAddress>>(
                     getProvider(), 
                     request, 
-                    new QingCloudDriverToCoreMapper<DescribeEipsResponseModel, List<ResourceStatus>>(){
-        				@Override
-        				protected List<ResourceStatus> doMapFrom(DescribeEipsResponseModel responseModel) {
-        					List<ResourceStatus> statuses = new ArrayList<ResourceStatus>();
-        					if (responseModel != null && responseModel.getEipSet() != null && responseModel.getEipSet().size() > 0) {
-        						for (DescribeEipsResponseModel.DescribeEipsResponseItemModel eipResponseItem : responseModel.getEipSet()) {
-        							statuses.add(new ResourceStatus(eipResponseItem.getEipId(), eipResponseItem.getStatus()));
-        						}
-        					}
-        					return statuses;
-        				}
-        			}, 
+                    mapper, 
                     DescribeEipsResponseModel.class);
-            return requester.execute();
+			
+			List<ResourceStatus> statuses = new ArrayList<ResourceStatus>();
+            for(IpAddress ipAddress : requester.execute()) {
+            	statuses.add(new ResourceStatus(ipAddress.getProviderIpAddressId(), 
+            			mapper.getIpAddressStatusMap().get(ipAddress.getProviderIpAddressId())));
+            }
+            return statuses;
 		} finally {
 			APITrace.end();
 		}
@@ -312,7 +248,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			requestBuilder.parameter("eips.1", addressId);
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
-            Requester<ReleaseEipsResponseModel> requester = new QingCloudRequester<ReleaseEipsResponseModel, ReleaseEipsResponseModel>(getProvider(), request, ReleaseEipsResponseModel.class);
+            Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(getProvider(), request, SimpleJobResponseModel.class);
             requester.execute();
 		} finally {
 			APITrace.end();
@@ -391,18 +327,16 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			} 
 			
 			String ipAddressId =  request(version);
-			
 			QingCloudVlan.IdentityGenerator identityGenerator = new QingCloudVlan.IdentityGenerator(vlanId);
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ModifyRouterAttributes");
 			requestBuilder.parameter("router", identityGenerator.getId());
 			requestBuilder.parameter("eip", ipAddressId);
 			requestBuilder.parameter("zone", getProviderDataCenterId());
-			Requester<ModifyRouterAttributesResponseModel> requester = new QingCloudRequester<ModifyRouterAttributesResponseModel, ModifyRouterAttributesResponseModel>(
-	                getProvider(), requestBuilder.build(), ModifyRouterAttributesResponseModel.class);
+			Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(
+	                getProvider(), requestBuilder.build(), ResponseModel.class);
 			requester.execute();
 			
 			return ipAddressId;
-			
 		} finally {
 			APITrace.end();
 		}
@@ -513,8 +447,60 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 			requestBuilder.parameter("eips.1", addressId);
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			HttpUriRequest request = requestBuilder.build();
-            Requester<DissociateEipsResponseModel> requester = new QingCloudRequester<DissociateEipsResponseModel, DissociateEipsResponseModel>(getProvider(), request, DissociateEipsResponseModel.class);
+            Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(getProvider(), request, SimpleJobResponseModel.class);
             requester.execute();
+		}
+	}
+	
+	private class IpAddressesMapper extends QingCloudDriverToCoreMapper<DescribeEipsResponseModel, List<IpAddress>> {
+		
+		private Map<String, String> ipAddressStatusMap;
+		
+		public Map<String, String> getIpAddressStatusMap() {
+			return ipAddressStatusMap;
+		}
+
+		@Override
+		protected List<IpAddress> doMapFrom(
+				DescribeEipsResponseModel responseModel) {
+			try {
+				List<IpAddress> ipAddresses = new ArrayList<IpAddress>();
+				if (responseModel != null && responseModel.getEipSet() != null) {
+					for (DescribeEipsResponseItemModel item : responseModel.getEipSet()) {
+						IpAddress ipAddress = new IpAddress();
+						ipAddress.setAddress(item.getEipAddress());
+						ipAddress.setAddressType(AddressType.PUBLIC);
+						ipAddress.setIpAddressId(item.getEipId());
+						ipAddress.setRegionId(getContext().getRegionId());
+						ipAddress.setVersion(IPVersion.IPV4);
+						if (item.getResource() != null && item.getResource().size() > 0) {
+							if (item.getResource().get("resource_type").equals("instance")) {
+								ipAddress.setServerId(item.getResource().get("resource_id").toString());
+							} else if (item.getResource().get("resource_type").equals("loadbalancer")) {
+								ipAddress.setProviderLoadBalancerId(item.getResource().get("resource_id").toString());
+							} else if (item.getResource().get("resource_type").equals("router")) {
+								String routerCidr = getVlanCidrByRouterId(item.getResource().get("resource_id").toString());
+								ipAddress.setProviderVlanId(new QingCloudVlan.IdentityGenerator(
+										item.getResource().get("resource_id").toString(), 
+										routerCidr).toString());
+							}
+						}
+						
+						if (item.getStatus() != null) {
+							if (ipAddressStatusMap == null) {
+								ipAddressStatusMap = new HashMap<String, String>();
+							}
+							ipAddressStatusMap.put(ipAddress.getProviderIpAddressId(), item.getStatus());
+						}
+						
+						ipAddresses.add(ipAddress);
+					}
+				}
+				return ipAddresses;
+			} catch (Exception e) {
+				stdLogger.error("map from response to ip address list failed!", e);
+				throw new RuntimeException(e);
+			}
 		}
 	}
 

@@ -28,14 +28,12 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.qingcloud.QingCloud;
-import org.dasein.cloud.qingcloud.model.AttachTagsResponseModel;
 import org.dasein.cloud.qingcloud.model.CreateTagResponseModel;
 import org.dasein.cloud.qingcloud.model.DeleteTagsResponseModel;
 import org.dasein.cloud.qingcloud.model.DescribeTagsResponseModel;
-import org.dasein.cloud.qingcloud.model.DetachTagsResponseModel;
-import org.dasein.cloud.qingcloud.model.ModifyTagAttributesResponseModel;
 import org.dasein.cloud.qingcloud.model.DescribeTagsResponseModel.DescribeTagsResponseItemModel;
 import org.dasein.cloud.qingcloud.model.DescribeTagsResponseModel.DescribeTagsResponseItemModel.ResourceTagPair;
+import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
@@ -173,10 +171,10 @@ public class QingCloudTags {
 			requestBuilder.parameter("tag", tagId);
 			requestBuilder.parameter("description", tag.getValue());
 			requestBuilder.parameter("zone", providerDataCenterId);
-			Requester<ModifyTagAttributesResponseModel> modifyTagAttributesRequester = new QingCloudRequester<ModifyTagAttributesResponseModel, ModifyTagAttributesResponseModel>(
+			Requester<ResponseModel> modifyTagAttributesRequester = new QingCloudRequester<ResponseModel, ResponseModel>(
                     provider, 
                     requestBuilder.build(), 
-                    ModifyTagAttributesResponseModel.class);
+                    ResponseModel.class);
 			modifyTagAttributesRequester.execute();
 			
 			tagIds.add(tagId);
@@ -192,10 +190,10 @@ public class QingCloudTags {
 					requestBuilder.parameter("resource_tag_pairs." + (i + j + 1) + ".resource_id", resourceIds[i]);
 				}
 			}
-			Requester<AttachTagsResponseModel> attachTagsRequester = new QingCloudRequester<AttachTagsResponseModel, AttachTagsResponseModel>(
+			Requester<ResponseModel> attachTagsRequester = new QingCloudRequester<ResponseModel, ResponseModel>(
                     provider, 
                     requestBuilder.build(), 
-                    AttachTagsResponseModel.class);
+                    ResponseModel.class);
 			attachTagsRequester.execute();
 		}
 	}
@@ -224,10 +222,10 @@ public class QingCloudTags {
 				}
 			}
 		}
-		Requester<DetachTagsResponseModel> modifyRequester = new QingCloudRequester<DetachTagsResponseModel, DetachTagsResponseModel>(
+		Requester<ResponseModel> modifyRequester = new QingCloudRequester<ResponseModel, ResponseModel>(
                 provider, 
                 requestBuilder.build(), 
-                DetachTagsResponseModel.class);
+                ResponseModel.class);
 		modifyRequester.execute();
 		
 		for (int i = 0; i < deletedTagIds.size(); i++) {
@@ -253,10 +251,10 @@ public class QingCloudTags {
 						requestBuilder.parameter("tag", subnetTag.getTagId());
 						requestBuilder.parameter("description", tag.getValue());
 						requestBuilder.parameter("zone", getProviderDataCenterId());
-						Requester<ModifyTagAttributesResponseModel> requester = new QingCloudRequester<ModifyTagAttributesResponseModel, ModifyTagAttributesResponseModel>(
+						Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(
 			                    provider, 
 			                    requestBuilder.build(), 
-			                    ModifyTagAttributesResponseModel.class);
+			                    ResponseModel.class);
 						requester.execute();
 						break;
 					}
