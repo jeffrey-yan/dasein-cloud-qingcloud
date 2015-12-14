@@ -19,7 +19,7 @@
  *
  */
 
-package org.dasein.cloud.qingcloud;
+package org.dasein.cloud.qingcloud.dc;
 
 import org.apache.http.client.methods.HttpUriRequest;
 import org.dasein.cloud.CloudException;
@@ -30,7 +30,8 @@ import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.dc.DataCenterCapabilities;
 import org.dasein.cloud.dc.DataCenterServices;
 import org.dasein.cloud.dc.Region;
-import org.dasein.cloud.qingcloud.model.DescribeZonesResponseModel;
+import org.dasein.cloud.qingcloud.QingCloud;
+import org.dasein.cloud.qingcloud.dc.model.DescribeZonesResponseModel;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
@@ -47,8 +48,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Created by Jeffrey Yan on 11/9/2015.
@@ -58,7 +57,7 @@ import java.util.regex.Pattern;
  */
 public class QingCloudDataCenter extends AbstractDataCenterServices<QingCloud> implements DataCenterServices {
 
-    protected QingCloudDataCenter(QingCloud provider) {
+    public QingCloudDataCenter(QingCloud provider) {
         super(provider);
     }
 

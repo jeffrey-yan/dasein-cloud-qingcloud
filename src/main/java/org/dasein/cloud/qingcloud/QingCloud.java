@@ -24,13 +24,17 @@ package org.dasein.cloud.qingcloud;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.AbstractCloud;
 import org.dasein.cloud.CloudException;
+import org.dasein.cloud.CloudProvider;
 import org.dasein.cloud.ContextRequirements;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.dc.DataCenterServices;
 import org.dasein.cloud.dc.Region;
+import org.dasein.cloud.identity.IdentityServices;
 import org.dasein.cloud.qingcloud.compute.QingCloudCompute;
+import org.dasein.cloud.qingcloud.dc.QingCloudDataCenter;
+import org.dasein.cloud.qingcloud.identity.QingCloudIdentity;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -160,6 +164,12 @@ public class QingCloud extends AbstractCloud {
     @Override
     public DataCenterServices getDataCenterServices() {
         return new QingCloudDataCenter(this);
+    }
+
+    @Nullable
+    @Override
+    public IdentityServices getIdentityServices() {
+        return new QingCloudIdentity(this);
     }
 
     @Override

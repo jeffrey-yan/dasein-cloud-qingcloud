@@ -19,53 +19,39 @@
  *
  */
 
-package org.dasein.cloud.qingcloud;
+package org.dasein.cloud.qingcloud.identity;
 
 import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.dc.DataCenterCapabilities;
+import org.dasein.cloud.CloudException;
+import org.dasein.cloud.InternalException;
+import org.dasein.cloud.Requirement;
+import org.dasein.cloud.identity.ShellKeyCapabilities;
+import org.dasein.cloud.qingcloud.QingCloud;
 
 import javax.annotation.Nonnull;
 import java.util.Locale;
 
 /**
- * Created by Jeffrey Yan on 11/10/2015.
+ * Created by Jeffrey Yan on 12/14/2015.
  *
  * @author Jeffrey Yan
  * @since 2016.02.1
  */
-public class QingCloudDataCenterCapabilities extends AbstractCapabilities<QingCloud> implements DataCenterCapabilities {
+public class QingCloudShellKeyCapabilities extends AbstractCapabilities<QingCloud> implements ShellKeyCapabilities {
 
-    public QingCloudDataCenterCapabilities(@Nonnull QingCloud provider) {
+    public QingCloudShellKeyCapabilities(@Nonnull QingCloud provider) {
         super(provider);
     }
 
+    @Nonnull
     @Override
-    public String getProviderTermForDataCenter(Locale locale) {
-        return "Zone";
+    public Requirement identifyKeyImportRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
     }
 
+    @Nonnull
     @Override
-    public String getProviderTermForRegion(Locale locale) {
-        return "Region";
-    }
-
-    @Override
-    public boolean supportsAffinityGroups() {
-        return false;
-    }
-
-    @Override
-    public boolean supportsResourcePools() {
-        return false;
-    }
-
-    @Override
-    public boolean supportsStoragePools() {
-        return false;
-    }
-
-    @Override
-    public boolean supportsFolders() {
-        return false;
+    public String getProviderTermForKeypair(@Nonnull Locale locale) {
+        return "keypair";
     }
 }

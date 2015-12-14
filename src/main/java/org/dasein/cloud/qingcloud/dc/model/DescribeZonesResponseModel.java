@@ -19,10 +19,13 @@
  *
  */
 
-package org.dasein.cloud.qingcloud.model;
+package org.dasein.cloud.qingcloud.dc.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.dasein.cloud.qingcloud.model.DescribeResponseModel;
+
+import java.util.List;
 
 /**
  * Created by Jeffrey Yan on 11/12/2015.
@@ -31,37 +34,39 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 2016.02.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ResponseModel {
-    @JsonProperty("action")
-    private String action;
+public class DescribeZonesResponseModel extends DescribeResponseModel {
 
-    @JsonProperty("ret_code")
-    private int retCode;
+    @JsonProperty("zone_set")
+    private List<Zone> zones;
 
-    @JsonProperty("message")
-    private String errorMessage;
-
-    public String getAction() {
-        return action;
+    public List<Zone> getZones() {
+        return zones;
     }
 
-    public void setAction(String action) {
-        this.action = action;
+    public void setZones(List<Zone> zones) {
+        this.zones = zones;
     }
 
-    public int getRetCode() {
-        return retCode;
-    }
+    public static class Zone {
+        @JsonProperty("status")
+        private String status;
+        @JsonProperty("zone_id")
+        private String zoneId;
 
-    public void setRetCode(int retCode) {
-        this.retCode = retCode;
-    }
+        public String getStatus() {
+            return status;
+        }
 
-    public String getErrorMessage() {
-        return errorMessage;
-    }
+        public void setStatus(String status) {
+            this.status = status;
+        }
 
-    public void setErrorMessage(String errorMessage) {
-        this.errorMessage = errorMessage;
+        public String getZoneId() {
+            return zoneId;
+        }
+
+        public void setZoneId(String zoneId) {
+            this.zoneId = zoneId;
+        }
     }
 }

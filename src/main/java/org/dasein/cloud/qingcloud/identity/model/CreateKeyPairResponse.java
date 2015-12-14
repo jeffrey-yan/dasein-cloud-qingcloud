@@ -19,49 +19,40 @@
  *
  */
 
-package org.dasein.cloud.qingcloud.model;
+package org.dasein.cloud.qingcloud.identity.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.dasein.cloud.qingcloud.model.ResponseModel;
 
 /**
- * Created by Jeffrey Yan on 11/12/2015.
+ * Created by Jeffrey Yan on 12/14/2015.
  *
  * @author Jeffrey Yan
  * @since 2016.02.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ResponseModel {
+public class CreateKeyPairResponse extends ResponseModel {
+
     @JsonProperty("action")
-    private String action;
+    private String privateKey;
 
-    @JsonProperty("ret_code")
-    private int retCode;
+    @JsonProperty("action")
+    private String keypairId;
 
-    @JsonProperty("message")
-    private String errorMessage;
-
-    public String getAction() {
-        return action;
+    public String getPrivateKey() {
+        return privateKey;
     }
 
-    public void setAction(String action) {
-        this.action = action;
+    public void setPrivateKey(String privateKey) {
+        this.privateKey = privateKey;
     }
 
-    public int getRetCode() {
-        return retCode;
+    public String getKeypairId() {
+        return keypairId;
     }
 
-    public void setRetCode(int retCode) {
-        this.retCode = retCode;
-    }
-
-    public String getErrorMessage() {
-        return errorMessage;
-    }
-
-    public void setErrorMessage(String errorMessage) {
-        this.errorMessage = errorMessage;
+    public void setKeypairId(String keypairId) {
+        this.keypairId = keypairId;
     }
 }

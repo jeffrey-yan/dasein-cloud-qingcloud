@@ -19,27 +19,30 @@
  *
  */
 
-package org.dasein.cloud.qingcloud.model;
+package org.dasein.cloud.qingcloud.identity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import org.dasein.cloud.identity.AbstractIdentityServices;
+import org.dasein.cloud.identity.IdentityServices;
+import org.dasein.cloud.identity.ShellKeySupport;
+import org.dasein.cloud.qingcloud.QingCloud;
+
+import javax.annotation.Nullable;
 
 /**
- * Created by Jeffrey Yan on 12/7/2015.
+ * Created by Jeffrey Yan on 12/14/2015.
  *
  * @author Jeffrey Yan
  * @since 2016.02.1
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class SimpleJobResponseModel extends ResponseModel {
-    @JsonProperty("job_id")
-    private String jobId;
+public class QingCloudIdentity extends AbstractIdentityServices<QingCloud> implements IdentityServices {
 
-    public String getJobId() {
-        return jobId;
+    public QingCloudIdentity(QingCloud provider) {
+        super(provider);
     }
 
-    public void setJobId(String jobId) {
-        this.jobId = jobId;
+    @Override
+    @Nullable
+    public ShellKeySupport getShellKeySupport() {
+        return new QingCloudShellKey(getProvider());
     }
 }
