@@ -72,11 +72,8 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 	private static final String DefaultIpAddressBandwidth = "4Mbps";
 	private static final Integer DefaultResponseDataLimit = 999;
 	
-	protected QingCloudTags qingCloudTags;
-	
 	protected QingCloudIpAddress(QingCloud provider) {
 		super(provider);
-		this.qingCloudTags = new QingCloudTags(provider);
 	}
 
 	@Override

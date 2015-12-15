@@ -21,7 +21,6 @@
 package org.dasein.cloud.qingcloud.network;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -32,7 +31,6 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ResourceStatus;
-import org.dasein.cloud.Tag;
 import org.dasein.cloud.VisibleScope;
 import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.compute.VirtualMachine;
@@ -63,7 +61,6 @@ import org.dasein.cloud.qingcloud.model.DescribeVxnetsResponseModel.DescribeVxne
 import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
 import org.dasein.cloud.qingcloud.network.QingCloudTags.DescribeTag;
-import org.dasein.cloud.qingcloud.network.QingCloudTags.TagResourceType;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
@@ -112,11 +109,8 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 		}
 	}
 	
-	protected QingCloudTags qingCloudTags;
-	
 	protected QingCloudVlan(QingCloud provider) {
 		super(provider);
-		this.qingCloudTags = new QingCloudTags(provider);
 	}
 
 	@Override
@@ -353,6 +347,9 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 				stdLogger.error("create vlan failed for modify vlan attributes failed!", e);
 				this.removeVlan(new IdentityGenerator(routerId, options.getCidr()).toString());
 			}
+			
+			//TODO need to apply a eip for the vlan, or it cannot connect to the internet, see if change core
+			
 			return getVlan(new IdentityGenerator(routerId, options.getCidr()).toString());
 		} finally {
 			APITrace.end();
@@ -616,10 +613,6 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 							associatedInstances.put(vxnet.getVxnetId(), instances);
 						}
 						
-						List<DescribeTag> subnetTags = qingCloudTags.describeResourceTags(vxnet.getVxnetId());
-						for (DescribeTag tag : subnetTags) {
-							subnet.setTag(tag.getTagName(), tag.getTagDescription());
-						}
 						subnets.add(subnet);
 					}
 				}
@@ -679,20 +672,7 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 								routerVxnet.getVxnetName(), 
 								routerVxnet.getVxnetName(), 
 								routerVxnet.getIpNetwork());
-						List<DescribeTag> subnetTags;
-						try {
-							subnetTags = qingCloudTags.describeResourceTags(new IdentityGenerator(subnet.getProviderSubnetId()).getId());
-							for (DescribeTag tag : subnetTags) {
-								subnet.setTag(tag.getTagName(), tag.getTagDescription());
-							}
-							subnets.add(subnet);
-						} catch (InternalException e) {
-							stdLogger.error("retrieve tags for subnet " + subnetIdentityGenerator.getId() + " failed!", e);
-							throw new RuntimeException(e);
-						} catch (CloudException e) {
-							stdLogger.error("retrieve tags for subnet " + subnetIdentityGenerator.getId() + " failed!", e);
-							throw new RuntimeException(e);
-						}
+						subnets.add(subnet);
 					}
 				}
 				return subnets;
