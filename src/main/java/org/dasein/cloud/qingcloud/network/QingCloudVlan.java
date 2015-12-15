@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
@@ -79,6 +80,7 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 		VLANSupport {
 
 	private static final Logger stdLogger = QingCloud.getStdLogger(QingCloudVlan.class);
+	private static final Integer DefaultResponseDataLimit = 999;
 	
 	public static class IdentityGenerator {
 		
@@ -286,6 +288,7 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeRouterVxnets");
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			requestBuilder.parameter("verbose", 1);
+			requestBuilder.parameter("limit", DefaultResponseDataLimit);
 			requestBuilder.parameter("router", vlanIdentityGenerator.getId());
 			Requester<List<Subnet>> describeRouterVxnetsRequester = new QingCloudRequester<DescribeRouterVxnetsResponseModel, List<Subnet>>(
                     getProvider(), 
@@ -408,6 +411,7 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
 		APITrace.begin(getProvider(), "QingCloudVlan.listVlans");
 		try {
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeRouters");
+			requestBuilder.parameter("limit", DefaultResponseDataLimit);
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			Requester<List<VLAN>> requester = new QingCloudRequester<DescribeRoutersResponseModel, List<VLAN>>(
                     getProvider(), 
@@ -491,57 +495,6 @@ public class QingCloudVlan extends AbstractVLANSupport<QingCloud> implements
                 SimpleJobResponseModel.class);
 		requester.execute();
 	} 
-	
-	@Override
-	public void removeSubnetTags(String subnetId, Tag... tags)
-			throws CloudException, InternalException {
-		removeSubnetTags((String[]) Arrays.asList(subnetId).toArray(), tags);
-	}
-
-	@Override
-	public void removeSubnetTags(String[] subnetIds, Tag... tags)
-			throws CloudException, InternalException {
-		APITrace.begin(getProvider(), "QingCloudIpAddress.removeSubnetTags");
-		try {
-			qingCloudTags.removeResourcesTags(TagResourceType.VXNET, subnetIds, tags);
-		} finally {
-			APITrace.end();
-		}
-	}
-
-	@Override
-	public void setSubnetTags(String subnetId, Tag... tags)
-			throws CloudException, InternalException {
-		setSubnetTags((String[]) Arrays.asList(subnetId).toArray(), tags);
-	}
-	
-	@Override
-	public void setSubnetTags(String[] subnetIds, Tag... tags)
-			throws CloudException, InternalException {
-		APITrace.begin(getProvider(), "QingCloudIpAddress.setSubnetTags");
-		try {
-			qingCloudTags.setResourcesTags(TagResourceType.VXNET, subnetIds, tags);
-		} finally {
-			APITrace.end();
-		}
-	}
-
-	@Override
-	public void updateSubnetTags(String subnetId, Tag... tags)
-			throws CloudException, InternalException {
-		updateSubnetTags((String[]) Arrays.asList(subnetId).toArray(), tags);
-	}
-
-	@Override
-	public void updateSubnetTags(String[] subnetIds, Tag... tags)
-			throws CloudException, InternalException {
-		APITrace.begin(getProvider(), "QingCloudIpAddress.updateSubnetTags");
-		try {
-			qingCloudTags.updateResourcesTags(TagResourceType.VXNET, subnetIds, tags);
-		} finally {
-			APITrace.end();
-		}
-	}
 
 	@Override
 	public String getProviderTermForNetworkInterface(Locale locale) {
