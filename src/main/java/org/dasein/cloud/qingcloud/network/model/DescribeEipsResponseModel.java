@@ -18,10 +18,12 @@
  *  ====================================================================
  *
  */
-package org.dasein.cloud.qingcloud.model;
+package org.dasein.cloud.qingcloud.network.model;
 
 import java.util.List;
 import java.util.Map;
+
+import org.dasein.cloud.qingcloud.model.DescribeResponseModel;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

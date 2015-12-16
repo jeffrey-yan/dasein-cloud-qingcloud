@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
@@ -43,20 +44,20 @@ import org.dasein.cloud.network.IpForwardingRule;
 import org.dasein.cloud.network.Protocol;
 import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.qingcloud.QingCloud;
-import org.dasein.cloud.qingcloud.model.AddRouterStaticsResponseModel;
-import org.dasein.cloud.qingcloud.model.AllocateEipsResponseModel;
-import org.dasein.cloud.qingcloud.model.DeleteRouterStaticsResponseModel;
-import org.dasein.cloud.qingcloud.model.DescribeEipsResponseModel;
-import org.dasein.cloud.qingcloud.model.DescribeEipsResponseModel.DescribeEipsResponseItemModel;
-import org.dasein.cloud.qingcloud.model.DescribeRouterStaticsResponseModel.DescribeRouterStaticsResponseItemModel;
-import org.dasein.cloud.qingcloud.model.DescribeRouterStaticsResponseModel;
 import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.requester.fluent.Requester;
-import org.dasein.cloud.qingcloud.model.DescribeRoutersResponseModel;
+import org.dasein.cloud.qingcloud.network.model.AddRouterStaticsResponseModel;
+import org.dasein.cloud.qingcloud.network.model.AllocateEipsResponseModel;
+import org.dasein.cloud.qingcloud.network.model.DeleteRouterStaticsResponseModel;
+import org.dasein.cloud.qingcloud.network.model.DescribeEipsResponseModel;
+import org.dasein.cloud.qingcloud.network.model.DescribeEipsResponseModel.DescribeEipsResponseItemModel;
+import org.dasein.cloud.qingcloud.network.model.DescribeRouterStaticsResponseModel;
+import org.dasein.cloud.qingcloud.network.model.DescribeRouterStaticsResponseModel.DescribeRouterStaticsResponseItemModel;
+import org.dasein.cloud.qingcloud.network.model.DescribeRoutersResponseModel;
 
 /**
  * Created by Jane Wang on 12/07/2015.
@@ -604,10 +605,7 @@ public class QingCloudIpAddress extends AbstractIpAddressSupport<QingCloud>
 							} else if (item.getResource().get("resource_type").equals("loadbalancer")) {
 								ipAddress.setProviderLoadBalancerId(item.getResource().get("resource_id").toString());
 							} else if (item.getResource().get("resource_type").equals("router")) {
-								String routerCidr = getVlanCidrByRouterId(item.getResource().get("resource_id").toString());
-								ipAddress.setProviderVlanId(new QingCloudVlan.IdentityGenerator(
-										item.getResource().get("resource_id").toString(), 
-										routerCidr).toString());
+								ipAddress.setProviderVlanId(item.getResource().get("resource_id").toString());
 							}
 							if (ipAddressResourceMap == null) {
 								ipAddressResourceMap = new HashMap<String, IpAddressResource>();
