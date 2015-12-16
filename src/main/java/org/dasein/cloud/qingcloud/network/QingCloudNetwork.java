@@ -21,14 +21,9 @@
 package org.dasein.cloud.qingcloud.network;
 
 import org.dasein.cloud.network.AbstractNetworkServices;
-import org.dasein.cloud.network.DNSSupport;
-import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IpAddressSupport;
-import org.dasein.cloud.network.LoadBalancerSupport;
-import org.dasein.cloud.network.NetworkFirewallSupport;
 import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.VLANSupport;
-import org.dasein.cloud.network.VpnSupport;
 import org.dasein.cloud.qingcloud.QingCloud;
 
 /**
@@ -45,85 +40,13 @@ public class QingCloudNetwork extends AbstractNetworkServices<QingCloud>
 	}
 
 	@Override
-	public DNSSupport getDnsSupport() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public FirewallSupport getFirewallSupport() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public IpAddressSupport getIpAddressSupport() {
 		return new QingCloudIpAddress(getProvider());
 	}
 
 	@Override
-	public LoadBalancerSupport getLoadBalancerSupport() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public NetworkFirewallSupport getNetworkFirewallSupport() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public VLANSupport getVlanSupport() {
 		return new QingCloudVlan(getProvider());
-	}
-
-	@Override
-	public VpnSupport getVpnSupport() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public boolean hasDnsSupport() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public boolean hasFirewallSupport() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public boolean hasIpAddressSupport() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public boolean hasLoadBalancerSupport() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public boolean hasNetworkFirewallSupport() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public boolean hasVlanSupport() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public boolean hasVpnSupport() {
-		// TODO Auto-generated method stub
-		return false;
 	}
 
 }

@@ -18,9 +18,9 @@
  *  ====================================================================
  *
  */
-package org.dasein.cloud.qingcloud.model;
+package org.dasein.cloud.qingcloud.network.model;
 
-import java.util.List;
+import org.dasein.cloud.qingcloud.model.ResponseModel;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -30,17 +30,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @author Jane Wang
  * @since 2016.02.1
  */
-public class DeleteTagsResponseModel extends ResponseModel {
+public class CreateTagResponseModel extends ResponseModel {
 
-	@JsonProperty("tags")
-	private List<String> tags;
+	@JsonProperty("tag_id")
+	private String tagId;
 
-	public List<String> getTags() {
-		return tags;
+	public String getTagId() {
+		return tagId;
 	}
-
-	public void setTags(List<String> tags) {
-		this.tags = tags;
+	public void setTagId(String tagId) {
+		this.tagId = tagId;
 	}
 
 }

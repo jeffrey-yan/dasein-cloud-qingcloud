@@ -123,7 +123,7 @@ public class QingCloudVlanCapabilities extends AbstractCapabilities<QingCloud>
 	@Override
 	public Requirement getSubnetSupport() throws CloudException,
 			InternalException {
-		return Requirement.OPTIONAL;
+		return Requirement.REQUIRED;
 	}
 
 	@Override
