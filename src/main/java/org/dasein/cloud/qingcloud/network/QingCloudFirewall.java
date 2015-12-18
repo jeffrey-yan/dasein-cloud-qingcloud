@@ -92,14 +92,8 @@ public class QingCloudFirewall extends
 			requestBuilder.parameter("rules.1.priority", precedence);
 			requestBuilder.parameter("rules.1.action", permission.equals(Permission.ALLOW) ? "accept" : "drop");
 			requestBuilder.parameter("rules.1.direction", direction.equals(Direction.INGRESS) ? 0 : 1);
-			if (direction.equals(Direction.INGRESS)) {
-				if (sourceEndpoint.getCidr() != null) {
-					requestBuilder.parameter("rules.1.val3", sourceEndpoint.getCidr());
-				}
-			} else {
-				if (destinationEndpoint.getCidr() != null) {
-					requestBuilder.parameter("rules.1.val3", destinationEndpoint.getCidr());
-				}
+			if (sourceEndpoint.getCidr() != null) {
+				requestBuilder.parameter("rules.1.val3", sourceEndpoint.getCidr());
 			}
 			if (protocol.equals(Protocol.TCP) || protocol.equals(Protocol.UDP)) {
 				requestBuilder.parameter("rules.1.val1", beginPort);
@@ -401,29 +395,16 @@ public class QingCloudFirewall extends
 				List<FirewallRule> firewallRules = new ArrayList<FirewallRule>();
 				if (responseModel != null && responseModel.getSecurityGroupRuleSet() != null && responseModel.getSecurityGroupRuleSet().size() > 0) {
 					for (DescribeSecurityGroupRulesResponseItemModel item : responseModel.getSecurityGroupRuleSet()) {
-						
 						Protocol protocol = mapFromProtocol(item.getProtocol());
-						Direction direction = mapFromDirection(item.getDirection());
-						
-						RuleTarget sourceEndpoint = null;
-						RuleTarget destinationEndpoint = null;
-						
-						if (direction.equals(Direction.INGRESS)) {
-							sourceEndpoint = mapFromVal3OrSecurityGroupId(item.getVal3(), item.getSecurityGroupId());
-						} else {
-							destinationEndpoint = mapFromVal3OrSecurityGroupId(item.getVal3(), item.getSecurityGroupId());
-						}
-						
 						FirewallRule rule = FirewallRule.getInstance(item.getSecurityGroupRuleId(), 
 								item.getSecurityGroupId(),  
-								sourceEndpoint, 
-								direction, 
+								mapFromVal3OrSecurityGroupId(item.getVal3(), item.getSecurityGroupId()), 
+								mapFromDirection(item.getDirection()), 
 								protocol, 
 								mapFromAction(item.getAction()), 
-								destinationEndpoint, 
-								protocol.equals(Protocol.TCP) || protocol.equals(Protocol.UDP) ? Integer.valueOf(item.getVal1()) : 0, 
-								protocol.equals(Protocol.TCP) || protocol.equals(Protocol.UDP) ? Integer.valueOf(item.getVal2()) : 0);
-					
+								RuleTarget.getGlobal(item.getSecurityGroupId()), 
+								mapFromValAndProtocol(item.getVal1(), protocol), 
+								mapFromValAndProtocol(item.getVal2(), protocol));
 						firewallRules.add(rule);
 					}
 				}
@@ -431,6 +412,10 @@ public class QingCloudFirewall extends
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
+		}
+		
+		private int mapFromValAndProtocol(String val, Protocol protocol) {
+			return protocol.equals(Protocol.TCP) || protocol.equals(Protocol.UDP) ? Integer.valueOf(val) : 0;
 		}
 		
 		private Protocol mapFromProtocol(String protocol) {

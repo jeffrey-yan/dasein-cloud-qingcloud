@@ -20,8 +20,12 @@
  */
 package org.dasein.cloud.qingcloud.network;
 
+import javax.annotation.Nullable;
+
 import org.dasein.cloud.network.AbstractNetworkServices;
+import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IpAddressSupport;
+import org.dasein.cloud.network.LoadBalancerSupport;
 import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.qingcloud.QingCloud;
@@ -48,5 +52,14 @@ public class QingCloudNetwork extends AbstractNetworkServices<QingCloud>
 	public VLANSupport getVlanSupport() {
 		return new QingCloudVlan(getProvider());
 	}
+	
+	@Override
+	public @Nullable FirewallSupport getFirewallSupport() {
+		return new QingCloudFirewall(getProvider());
+	}
 
+	@Override
+	public LoadBalancerSupport getLoadBalancerSupport() {
+		return new QingCloudLoadBalancer(getProvider());
+	}
 }
