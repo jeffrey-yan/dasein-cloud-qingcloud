@@ -20,10 +20,18 @@
  */
 package org.dasein.cloud.qingcloud.network;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
+
+import javax.annotation.Nonnull;
+
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.AbstractLoadBalancerSupport;
@@ -52,6 +60,7 @@ import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
 import org.dasein.cloud.qingcloud.network.model.AddLoadBalancerBackendsResponseModel;
 import org.dasein.cloud.qingcloud.network.model.AddLoadBalancerListenersResponseModel;
 import org.dasein.cloud.qingcloud.network.model.CreateLoadBalancerResponseModel;
+import org.dasein.cloud.qingcloud.network.model.CreateServerCertificateResponseModel;
 import org.dasein.cloud.qingcloud.network.model.DeleteLoadBalancerBackendsResponseModel;
 import org.dasein.cloud.qingcloud.network.model.DeleteLoadBalancerListenersResponseModel;
 import org.dasein.cloud.qingcloud.network.model.DescribeLoadBalancerListenersResponseModel;
@@ -59,6 +68,8 @@ import org.dasein.cloud.qingcloud.network.model.DescribeLoadBalancerListenersRes
 import org.dasein.cloud.qingcloud.network.model.DescribeLoadBalancerListenersResponseModel.DescribeLoadBalancerListenersResponseItemModel.DescribeLoadBalancerListenerBackends;
 import org.dasein.cloud.qingcloud.network.model.DescribeLoadBalancersResponseModel;
 import org.dasein.cloud.qingcloud.network.model.DescribeLoadBalancersResponseModel.DescribeLoadBalancersResponseItemModel;
+import org.dasein.cloud.qingcloud.network.model.DescribeServerCertificatesResponseModel;
+import org.dasein.cloud.qingcloud.network.model.DescribeServerCertificatesResponseModel.DescribeServerCertificatesResponseItemModel;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudDriverToCoreMapper;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequestBuilder;
 import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
@@ -74,12 +85,23 @@ import org.dasein.cloud.util.requester.fluent.Requester;
 public class QingCloudLoadBalancer extends
 		AbstractLoadBalancerSupport<QingCloud> implements LoadBalancerSupport {
 
+	private static final String DefaultDateFormat = "yyyy-MM-dd'T'hh:mm:ss'Z'";
+	
 	private static final Integer DefaultResponseDataLimit = 999;
-	private static final String SessionStickyInsert = "insert|3600";
+	
+	private static final String DefaultSessionStickyInsert = "insert|3600";
 	private static final String SessionStickyRewrite = "prefix|%s";
+	
+	private static final Integer DefaultBackendServerWeight = 5;
+	
 	private static final String HealthCheckMethodHttp = "http|%s|%s";
 	private static final String HealthCheckOption = "%d|%d|%d|%d";
-	private static final Integer DefaultBackendServerWeight = 5;
+	
+	private static final Integer DefaultLoadBalancerHealthCheckInterval = 10;
+	private static final Integer DefaultLoadBalancerHealthCheckTimeout = 5;
+	private static final Integer DefaultLoadBalancerHealthCheckUnhealthyCount = 2;
+	private static final Integer DefaultLoadBalancerHealthCheckHealthyCount = 5;
+	private static final String DefaultHealthCheckProtocol = "tcp";
 	
 	protected QingCloudLoadBalancer(QingCloud provider) {
 		super(provider);
@@ -129,7 +151,7 @@ public class QingCloudLoadBalancer extends
 					if (listener.getCookie() != null) {
 						requestBuilder.parameter("listeners." + (i + 1) + ".session_sticky", String.format(SessionStickyRewrite, listener.getCookie()));
 					} else {
-						requestBuilder.parameter("listeners." + (i + 1) + ".session_sticky", SessionStickyInsert);
+						requestBuilder.parameter("listeners." + (i + 1) + ".session_sticky", DefaultSessionStickyInsert);
 					}
 				}
 				
@@ -137,7 +159,7 @@ public class QingCloudLoadBalancer extends
 				if (listener.getProviderLBHealthCheckId() != null) {
 					LoadBalancerHealthCheck healthCheck = this.getLoadBalancerHealthCheck(listener.getProviderLBHealthCheckId(), toLoadBalancerId);
 					if (healthCheck != null) {
-						requestBuilder.parameter("listeners." + (i + 1) + ".healthy_check_method", SessionStickyInsert);
+						requestBuilder.parameter("listeners." + (i + 1) + ".healthy_check_method", DefaultSessionStickyInsert);
 						//TODO not support all hclprotocols, no capability matching
 						if (healthCheck.getProtocol().equals(HCProtocol.HTTP)) {
 							requestBuilder.parameter("listeners." + (i + 1) + ".healthy_check_method", 
@@ -164,6 +186,8 @@ public class QingCloudLoadBalancer extends
 					requestBuilder.build(), 
 					AddLoadBalancerListenersResponseModel.class);
 			requester.execute();
+			
+			updateLoadBalancers(toLoadBalancerId);
 		} finally {
 			APITrace.end();
 		}
@@ -182,11 +206,11 @@ public class QingCloudLoadBalancer extends
 			//search public port mapping listener
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DeleteLoadBalancerListeners");
 			requestBuilder.parameter("zone", getProviderDataCenterId());
-			List<DescribeLoadBalancerListenersResponseItemModel> lbListeners = listListeners(toLoadBalancerId);
+			List<QingCloudLbListener> lbListeners = listListeners(toLoadBalancerId);
 			if (lbListeners != null && lbListeners.size() > 0) {
 				for (int i = 0; i < listeners.length; i++) {
-					for (DescribeLoadBalancerListenersResponseItemModel lbListener : lbListeners) {
-						Integer lbListenerPort = lbListener.getListenerPort();
+					for (QingCloudLbListener lbListener : lbListeners) {
+						Integer lbListenerPort = lbListener.getLbListener().getPublicPort();
 						if (lbListenerPort == listeners[i].getPublicPort()) {
 							requestBuilder.parameter("loadbalancer_listeners." + (i + 1), lbListeners.get(lbListenerPort));
 							break;
@@ -200,6 +224,8 @@ public class QingCloudLoadBalancer extends
 					requestBuilder.build(), 
 					DeleteLoadBalancerListenersResponseModel.class);
 			requester.execute();
+			
+			updateLoadBalancers(toLoadBalancerId);
 		} finally {
 			APITrace.end();
 		}
@@ -215,15 +241,15 @@ public class QingCloudLoadBalancer extends
 				throw new InternalException("Invalid load balancer id!");
 			}
 			
-			List<DescribeLoadBalancerListenersResponseItemModel> listeners = listListeners(toLoadBalancerId);
-			for (DescribeLoadBalancerListenersResponseItemModel listener : listeners) {
+			List<QingCloudLbListener> listeners = listListeners(toLoadBalancerId);
+			for (QingCloudLbListener listener : listeners) {
 				QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("AddLoadBalancerBackends");
 				requestBuilder.parameter("zone", getProviderDataCenterId());
-				requestBuilder.parameter("loadbalancer_listener", listener.getLoadBalancerListenerId());
+				requestBuilder.parameter("loadbalancer_listener", listener.getListenerId());
 				for (int i = 0; i < serverIdsToAdd.length; i++) {
 					String serverIdToAdd = serverIdsToAdd[i];
 					requestBuilder.parameter("backends." + (i + 1) + ".resource_id", serverIdToAdd);
-					requestBuilder.parameter("backends." + (i + 1) + ".port", listener.getListenerPort()); //TODO same port as the public one
+					requestBuilder.parameter("backends." + (i + 1) + ".port", listener.getLbListener().getPublicPort()); //TODO check same port as the public one
 					requestBuilder.parameter("backends." + (i + 1) + ".weight", DefaultBackendServerWeight);
 				}
 				Requester<AddLoadBalancerBackendsResponseModel> requester = new QingCloudRequester<AddLoadBalancerBackendsResponseModel, AddLoadBalancerBackendsResponseModel>(
@@ -233,6 +259,7 @@ public class QingCloudLoadBalancer extends
 				requester.execute();
 			}
 			
+			updateLoadBalancers(toLoadBalancerId);
 		} finally {
 			APITrace.end();
 		}
@@ -282,9 +309,10 @@ public class QingCloudLoadBalancer extends
 			}
 			
 			if (options.getHealthCheckOptions() != null) {
-				this.createLoadBalancerHealthCheck(options.getHealthCheckOptions());
+				createLoadBalancerHealthCheck(options.getHealthCheckOptions());
 			}
 			
+			updateLoadBalancers(response.getLoadbalancerId());
 			return response.getLoadbalancerId();
 		} finally {
 			APITrace.end();
@@ -398,14 +426,14 @@ public class QingCloudLoadBalancer extends
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DeleteLoadBalancerBackends");
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			
-			List<DescribeLoadBalancerListenersResponseItemModel> listeners = listListeners(fromLoadBalancerId);
+			List<QingCloudLbListener> listeners = listListeners(fromLoadBalancerId);
 			int backendCount = 0;
-			for (DescribeLoadBalancerListenersResponseItemModel listener : listeners) {
+			for (QingCloudLbListener listener : listeners) {
 				if (listener.getBackends() != null && listener.getBackends().size() > 0) {
-					for (DescribeLoadBalancerListenerBackends backend : listener.getBackends()) {
+					for (QingCloudLbListenerBackend backend : listener.getBackends()) {
 						for (String serverIdToRemove : serverIdsToRemove) {
 							if (serverIdToRemove.equals(backend.getResourceId())) {
-								requestBuilder.parameter("loadbalancer_backends." + (++backendCount), backend.getLoadbalancerBackendId());
+								requestBuilder.parameter("loadbalancer_backends." + (++backendCount), backend.getBackendId());
 								break;
 							}
 						}
@@ -424,145 +452,413 @@ public class QingCloudLoadBalancer extends
                     DeleteLoadBalancerBackendsResponseModel.class);
 			requester.execute();
 			
+			updateLoadBalancers(fromLoadBalancerId);
 		} finally {
 			APITrace.end();
 		}
 	}
 
 	@Override
-	public LoadBalancerHealthCheck createLoadBalancerHealthCheck(String name,
-			String description, String host, HCProtocol protocol, int port,
-			String path, int interval, int timeout, int healthyCount,
-			int unhealthyCount) throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public LoadBalancerHealthCheck createLoadBalancerHealthCheck(
 			HealthCheckOptions options) throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.createLoadBalancerHealthCheck");
+		try {
+			
+			if (options.getProviderLoadBalancerId() == null) {
+				throw new InternalException("Qingcloud not support create load balancer health check without load balancer id!");
+			}
+			if (options.getListener() == null) {
+				throw new InternalException("Qingcloud not support create load balancer health check without listener!");
+			}
+			if (options.getProtocol() == null) { 
+				throw new InternalException("Qingcloud not support create load balancer health check without protocol!");
+			} else if (!options.getProtocol().equals(HCProtocol.TCP) || !options.getProtocol().equals(HCProtocol.HTTP)) {
+				throw new OperationNotSupportedException("Qingcloud only support TCP and HTTP health check protocols!");
+			}
+			
+			String loadBalancerId = options.getProviderLoadBalancerId();
+			int publicPort = options.getListener().getPublicPort();
+			QingCloudLbListener listenerResponse = getListener(loadBalancerId, publicPort);
+			
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ModifyLoadBalancerListenerAttributes");
+			
+			requestBuilder.parameter("loadbalancer_listener", listenerResponse.getListenerId());
+			
+			if (options.getProtocol().equals(HCProtocol.TCP)) {
+				requestBuilder.parameter("healthy_check_method", "tcp");
+			} else if (options.getProtocol().equals(HCProtocol.HTTP)) {
+				requestBuilder.parameter("healthy_check_method", String.format(HealthCheckMethodHttp, options.getPath(), options.getHost()));
+			}
+			
+			int interval = DefaultLoadBalancerHealthCheckInterval;
+			if (options.getInterval() > 0) {
+				interval = options.getInterval();
+			}
+			int timeout = DefaultLoadBalancerHealthCheckTimeout;
+			if (options.getTimeout() > 0) {
+				timeout = options.getTimeout();
+			}
+			int unhealthyCount = DefaultLoadBalancerHealthCheckUnhealthyCount;
+			if (options.getUnhealthyCount() > 0) {
+				unhealthyCount = options.getUnhealthyCount();
+			}
+			int healthyCount = DefaultLoadBalancerHealthCheckHealthyCount;
+			if (options.getHealthyCount() > 0) {
+				healthyCount = options.getHealthyCount();
+			}
+			requestBuilder.parameter("healthy_check_option", String.format(HealthCheckOption, interval, timeout, unhealthyCount, healthyCount));
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    ResponseModel.class);
+			requester.execute();
+			
+			updateLoadBalancers(options.getProviderLoadBalancerId());
+			
+			return LoadBalancerHealthCheck.getInstance(listenerResponse.getListenerId(), 
+					null, 
+					null, 
+					options.getHost(), 
+					options.getProtocol(), 
+					publicPort,
+					options.getPath(), 
+					interval, 
+					timeout, 
+					healthyCount, 
+					unhealthyCount);
+		} finally {
+			APITrace.end();
+		}
+		
 	}
 
 	@Override
 	public LoadBalancerHealthCheck getLoadBalancerHealthCheck(
 			String providerLBHealthCheckId, String providerLoadBalancerId)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.getLoadBalancerHealthCheck");
+		try {
+			List<LoadBalancerHealthCheck> healthChecks = listHealthChecks(providerLoadBalancerId, providerLBHealthCheckId);
+			if (healthChecks.size() == 0) {
+				throw new InternalException("find health check by load balancer id " + providerLoadBalancerId + " and health check id " + providerLBHealthCheckId + " failed!");
+			}
+			return healthChecks.get(0);
+		} finally {
+			APITrace.end();
+		}
 	}
 
 	@Override
 	public Iterable<LoadBalancerHealthCheck> listLBHealthChecks(
 			HealthCheckFilterOptions options) throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.listLBHealthChecks");
+		try {
+			List<LoadBalancerHealthCheck> results = new ArrayList<LoadBalancerHealthCheck>();
+			for (LoadBalancerHealthCheck healthCheck : listHealthChecks(null, null)) {
+				if (options == null || options.matches(healthCheck)) {
+					results.add(healthCheck);
+				}
+			}
+			return results;
+		} finally {
+			APITrace.end();
+		}
 	}
-
-	@Override
-	public void attachHealthCheckToLoadBalancer(String providerLoadBalancerId,
-			String providerLBHealthCheckId) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-
+	
+	public List<LoadBalancerHealthCheck> listHealthChecks(String loadBalancerId, String listenerId) throws InternalException, CloudException {
+		QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeLoadBalancerListeners");
+		if (loadBalancerId != null) {
+			requestBuilder.parameter("loadbalancer", loadBalancerId);
+		}
+		if (listenerId != null) {
+			requestBuilder.parameter("loadbalancer_listeners.1", listenerId);
+		}
+		requestBuilder.parameter("verbose", 1);
+		requestBuilder.parameter("limit", DefaultResponseDataLimit);
+		requestBuilder.parameter("zone", getProviderDataCenterId());
+		
+		Requester<List<LoadBalancerHealthCheck>> requester = new QingCloudRequester<DescribeLoadBalancerListenersResponseModel, List<LoadBalancerHealthCheck>>(
+                getProvider(), 
+                requestBuilder.build(), 
+                new LoadBalancerHealthChecksMapper(), 
+                DescribeLoadBalancerListenersResponseModel.class);
+        return requester.execute();
 	}
-
-	@Override
-	public void detachHealthCheckFromLoadBalancer(
-			String providerLoadBalancerId, String providerLBHeathCheckId)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
+	
 	@Override
 	public LoadBalancerHealthCheck modifyHealthCheck(
 			String providerLBHealthCheckId, HealthCheckOptions options)
 			throws InternalException, CloudException {
-		// TODO Auto-generated method stub
-		return null;
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.modifyHealthCheck");
+		try {
+			
+			if (providerLBHealthCheckId == null) {
+				throw new InternalException("health check id cannot be null!");
+			}
+			
+			List<LoadBalancerHealthCheck> healthChecks = listHealthChecks(null, providerLBHealthCheckId);
+			if (healthChecks.size() == 0) {
+				throw new InternalException("find health check " + providerLBHealthCheckId + " failed!");
+			}
+			LoadBalancerHealthCheck healthCheck = healthChecks.get(0);
+			if (options == null) {
+				return healthCheck;
+			}
+			
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ModifyLoadBalancerListenerAttributes");
+			requestBuilder.parameter("loadbalancer_listener", healthCheck.getProviderLBHealthCheckId());
+			
+			String path = healthCheck.getPath();
+			String host = healthCheck.getHost();
+			if (options.getProtocol() != null) {
+				if (options.getProtocol().equals(HCProtocol.TCP)) {
+					requestBuilder.parameter("healthy_check_method", "tcp");
+				} else if (options.getProtocol().equals(HCProtocol.HTTP)) {
+					if (options.getPath() != null) {
+						path = options.getPath();
+					}
+					if (options.getHost() != null) {
+						host = options.getHost();
+					} 
+					requestBuilder.parameter("healthy_check_method", 
+							String.format(HealthCheckMethodHttp, path, host));
+				}
+			}
+			
+			int interval = healthCheck.getInterval();
+			if (options.getInterval() > 0) {
+				interval = options.getInterval();
+			} 
+			int timeout = healthCheck.getTimeout();
+			if (options.getTimeout() > 0) {
+				timeout = options.getTimeout();
+			}
+			int unhealthyCount = healthCheck.getUnhealthyCount();
+			if (options.getUnhealthyCount() > 0) {
+				unhealthyCount = options.getUnhealthyCount();
+			}
+			int healthyCount = healthCheck.getHealthyCount();
+			if (options.getHealthyCount() > 0) {
+				healthyCount = options.getHealthyCount();
+			}
+			requestBuilder.parameter("healthy_check_option", 
+					String.format(HealthCheckOption, interval, timeout, unhealthyCount, healthyCount));			
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			
+			Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    ResponseModel.class);
+			requester.execute();
+			
+			updateLoadBalancers(healthCheck.getProviderLoadBalancerIds().get(0));
+			return getLoadBalancerHealthCheck(
+					providerLBHealthCheckId, 
+					healthCheck.getProviderLoadBalancerIds().get(0));
+		} finally {
+			APITrace.end();
+		}
 	}
 
 	@Override
 	public void removeLoadBalancerHealthCheck(String providerLoadBalancerId)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.removeLoadBalancerHealthCheck");
+		try {
+			if (providerLoadBalancerId == null) {
+				throw new InternalException("Load balancer id cannot be null!");
+			}
+			List<LoadBalancerHealthCheck> healthChecks = listHealthChecks(providerLoadBalancerId, null);
+			for (LoadBalancerHealthCheck healthCheck : healthChecks) {
+				QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ModifyLoadBalancerListenerAttributes");
+				requestBuilder.parameter("loadbalancer_listener", healthCheck.getProviderLBHealthCheckId());
+				requestBuilder.parameter("healthy_check_method", DefaultHealthCheckProtocol);
+				requestBuilder.parameter("healthy_check_option", 
+						String.format(HealthCheckOption, 
+								DefaultLoadBalancerHealthCheckInterval,
+								DefaultLoadBalancerHealthCheckTimeout, 
+								DefaultLoadBalancerHealthCheckUnhealthyCount, 
+								DefaultLoadBalancerHealthCheckHealthyCount));
+				requestBuilder.parameter("zone", getProviderDataCenterId());
+				Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(
+	                    getProvider(), 
+	                    requestBuilder.build(), 
+	                    ResponseModel.class);
+				requester.execute();
+			}
+			
+			updateLoadBalancers(providerLoadBalancerId);
+		} finally {
+			APITrace.end();
+		}
 	}
 
 	@Override
 	public SSLCertificate createSSLCertificate(
 			SSLCertificateCreateOptions options) throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.createSSLCertificate");
+		try {
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("CreateServerCertificate");
+			requestBuilder.parameter("server_certificate_name", options.getCertificateName());
+			requestBuilder.parameter("certificate_content", options.getCertificateBody());
+			requestBuilder.parameter("private_key", options.getPrivateKey());
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			Requester<CreateServerCertificateResponseModel> requester = new QingCloudRequester<CreateServerCertificateResponseModel, CreateServerCertificateResponseModel>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    CreateServerCertificateResponseModel.class);
+			CreateServerCertificateResponseModel response = requester.execute();
+			if (response == null) {
+				throw new InternalException("Create SSL Certificate failed!");
+			}
+			return getSSLCertificate(response.getServerCertificateId());
+		} finally {
+			APITrace.end();
+		}
 	}
 
 	@Override
 	public Iterable<SSLCertificate> listSSLCertificates()
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.listSSLCertificates");
+		try {
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeServerCertificates");
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			Requester<List<SSLCertificate>> requester = new QingCloudRequester<DescribeServerCertificatesResponseModel, List<SSLCertificate>>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    new SSLCertificatesMapper(), 
+                    DescribeServerCertificatesResponseModel.class);
+            return requester.execute();
+		} finally {
+			APITrace.end();
+		}
 	}
-
+	
 	@Override
 	public void removeSSLCertificate(String certificateName)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.removeSSLCertificate");
+		try {
+			if (certificateName == null) {
+				throw new InternalException("Certificate name cannot be null!");
+			}
+			for(SSLCertificate sslCertificate : listSSLCertificates()) {
+				if (sslCertificate.getCertificateName().equals(certificateName)) {
+					QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeServerCertificates");
+					requestBuilder.parameter("server_certificates.1", sslCertificate.getProviderCertificateId());
+					requestBuilder.parameter("zone", getProviderDataCenterId());
+					Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(
+		                    getProvider(), 
+		                    requestBuilder.build(), 
+		                    SimpleJobResponseModel.class);
+					requester.execute();
+		            break;
+				}
+			}
+		} finally {
+			APITrace.end();
+		}
 	}
 
 	@Override
 	public void setSSLCertificate(SetLoadBalancerSSLCertificateOptions options)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.setSSLCertificate");
+		try {
+			SSLCertificate sslCertificate = getSSLCertificate(options.getSslCertificateName());
+			if (sslCertificate == null) {
+				throw new InternalException("Find ssl certificate " + options.getSslCertificateName() + " failed!");
+			}
+			LoadBalancer loadBalancer = getLoadBalancerByName(options.getLoadBalancerName());
+			if (loadBalancer == null) {
+				throw new InternalException("Find load balancer " + options.getLoadBalancerName() + " failed!");
+			}
+			QingCloudLbListener listener = getListener(
+					loadBalancer.getProviderLoadBalancerId(), 
+					options.getSslCertificateAssignToPort());
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ModifyLoadBalancerListenerAttributes");
+			requestBuilder.parameter("loadbalancer_listener", listener.getListenerId());
+			requestBuilder.parameter("server_certificate_id", sslCertificate.getProviderCertificateId());
+			requestBuilder.parameter("zone", getProviderDataCenterId());
+			Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    ResponseModel.class);
+			requester.execute();
+			
+			updateLoadBalancers(loadBalancer.getProviderLoadBalancerId());
+		} finally {
+			APITrace.end();
+		}
 	}
 
 	@Override
 	public SSLCertificate getSSLCertificate(String certificateName)
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.getSSLCertificate");
+		try {
+			for(SSLCertificate sslCertificate : listSSLCertificates()) {
+				if (sslCertificate.getCertificateName().equals(certificateName)) {
+					return sslCertificate;
+				}
+			}
+			return null;
+		} finally {
+			APITrace.end();
+		}
 	}
 
 	@Override
 	public void setFirewalls(String providerLoadBalancerId,
 			String... firewallIds) throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+		APITrace.begin(getProvider(), "QingCloudLoadBalancer.setFirewalls");
+		try {
+			if (providerLoadBalancerId == null) {
+				throw new InternalException("Load balancer id cannot be null!");
+			}
+			if (firewallIds == null || firewallIds.length == 0) {
+				throw new InternalException("Invalid firewall ids!");
+			}
+			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ModifyLoadBalancerAttributes");
+			requestBuilder.parameter("loadbalancer", providerLoadBalancerId);
+			requestBuilder.parameter("security_group", firewallIds[0]);
+			Requester<ResponseModel> requester = new QingCloudRequester<ResponseModel, ResponseModel>(
+                    getProvider(), 
+                    requestBuilder.build(), 
+                    ResponseModel.class);
+			requester.execute();
+			
+			updateLoadBalancers(providerLoadBalancerId);
+		} finally {
+			APITrace.end();
+		}
 	}
-
-	@Override
-	public void attachLoadBalancerToSubnets(String toLoadBalancerId,
-			String... subnetIdsToAdd) throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-
+	
+	private void updateLoadBalancers(String ... ids) throws InternalException, CloudException {
+		QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("UpdateLoadBalancers");
+		for (int i = 0; i < ids.length; i++) {
+			requestBuilder.parameter("loadbalancers." + (i + 1), ids[i]);
+		}
+		requestBuilder.parameter("zone", getProviderDataCenterId());
+		Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(
+                getProvider(), 
+                requestBuilder.build(), 
+                SimpleJobResponseModel.class);
+		requester.execute();
 	}
-
-	@Override
-	public void detachLoadBalancerFromSubnets(String fromLoadBalancerId,
-			String... subnetIdsToDelete) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void modifyLoadBalancerAttributes(String id,
-			LbAttributesOptions options) throws CloudException,
-			InternalException {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public LbAttributesOptions getLoadBalancerAttributes(String id)
-			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
+	
+	private LoadBalancer getLoadBalancerByName(String name) throws CloudException, InternalException {
+		for(LoadBalancer loadBalancer : listLoadBalancers()) {
+			if (loadBalancer.getName().equals(name)) {
+				return loadBalancer;
+			}
+		}
 		return null;
 	}
 	
@@ -576,19 +872,273 @@ public class QingCloudLoadBalancer extends
         return dataCenters.iterator().next().getProviderDataCenterId();//each account has one DC in each region
 	}
 	
-	private List<DescribeLoadBalancerListenersResponseItemModel> listListeners(String toLoadBalancerId) 
+	private QingCloudLbListener getListener(String toLoadBalancerId, int publicPort) 
 			throws InternalException, CloudException {
-		
+		List<QingCloudLbListener> listeners = listListeners(toLoadBalancerId);
+		if (listeners != null) {
+			for (QingCloudLbListener item : listeners) {
+				if (item.getLbListener().getPublicPort() == publicPort) {
+					return item;
+				}
+			}
+		}
+		return null;
+	}
+	
+	private List<QingCloudLbListener> listListeners(String toLoadBalancerId) 
+			throws InternalException, CloudException {
 		QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DescribeLoadBalancerListeners");
-		requestBuilder.parameter("loadbalancer", toLoadBalancerId);
+		if (toLoadBalancerId != null) {
+			requestBuilder.parameter("loadbalancer", toLoadBalancerId);
+		}
+		requestBuilder.parameter("verbose", 1);
+		requestBuilder.parameter("limit", DefaultResponseDataLimit);
 		requestBuilder.parameter("zone", getProviderDataCenterId());
 		
-		Requester<DescribeLoadBalancerListenersResponseModel> requester = new QingCloudRequester<DescribeLoadBalancerListenersResponseModel, DescribeLoadBalancerListenersResponseModel>(
-				getProvider(), 
-				requestBuilder.build(), 
-				DescribeLoadBalancerListenersResponseModel.class);
-		DescribeLoadBalancerListenersResponseModel response = requester.execute();
-		return response.getLoadbalancerListenerSet();
+		Requester<List<QingCloudLbListener>> requester = new QingCloudRequester<DescribeLoadBalancerListenersResponseModel, List<QingCloudLbListener>>(
+                getProvider(), 
+                requestBuilder.build(), 
+                new LoadBalancerListenersMapper(), 
+                DescribeLoadBalancerListenersResponseModel.class);
+        return requester.execute();
+	}
+	
+	private class SSLCertificatesMapper extends QingCloudDriverToCoreMapper<DescribeServerCertificatesResponseModel, List<SSLCertificate>> {
+		@Override
+		protected List<SSLCertificate> doMapFrom(
+				DescribeServerCertificatesResponseModel responseModel) {
+			try {
+				List<SSLCertificate> sslCertificates = new ArrayList<SSLCertificate>();
+				if (responseModel != null && responseModel.getServerCertificateSet() != null) {
+					for (DescribeServerCertificatesResponseItemModel sslCertificate : responseModel.getServerCertificateSet()) {
+						sslCertificates.add(SSLCertificate.getInstance(
+								sslCertificate.getServerCertificateName(), 
+								sslCertificate.getServerCertificateId(), 
+								mapFromCreateTime(sslCertificate.getCreate_time()),
+								sslCertificate.getCertificateContent(), 
+								null, 
+								null));
+					}
+				}
+				return sslCertificates;
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+		private Long mapFromCreateTime(String createTime) throws ParseException {
+			return new SimpleDateFormat(DefaultDateFormat).parse(createTime).getTime();
+		}
+	}
+	
+	private class LoadBalancerHealthChecksMapper extends QingCloudDriverToCoreMapper<DescribeLoadBalancerListenersResponseModel, List<LoadBalancerHealthCheck>> {
+		@Override
+		protected List<LoadBalancerHealthCheck> doMapFrom(
+				DescribeLoadBalancerListenersResponseModel responseModel) {
+			try {
+				List<LoadBalancerHealthCheck> healthChecks = new ArrayList<LoadBalancerHealthCheck>();
+				if (responseModel != null && responseModel.getLoadbalancerListenerSet() != null) {
+					for (DescribeLoadBalancerListenersResponseItemModel listener : responseModel.getLoadbalancerListenerSet()) {
+						LoadBalancerHealthCheck healthCheck = LoadBalancerHealthCheck.getInstance(listener.getLoadBalancerListenerId(), 
+								null, 
+								null, 
+								mapHostFromMethod(listener.getHealthyCheckMethod()), 
+								mapProtocolFromMethod(listener.getHealthyCheckMethod()), 
+								listener.getListenerPort(),
+								mapPathFromMethod(listener.getHealthyCheckMethod()),
+								Integer.valueOf(listener.getHealthyCheckOption().split("|")[0]),
+								Integer.valueOf(listener.getHealthyCheckOption().split("|")[1]),
+								Integer.valueOf(listener.getHealthyCheckOption().split("|")[3]),
+								Integer.valueOf(listener.getHealthyCheckOption().split("|")[2]));
+						
+						//Should have a listener with the healthcheck
+						DescribeLoadBalancerListenersResponseModel model = new DescribeLoadBalancerListenersResponseModel();
+						model.setLoadbalancerListenerSet(Arrays.asList(listener));
+						List<QingCloudLbListener> listeners = new LoadBalancerListenersMapper().doMapFrom(model);
+						if (listeners.size() > 0) {
+							healthCheck.addListener(listeners.get(0).getLbListener());
+							healthCheck.addProviderLoadBalancerId(listeners.get(0).getLoadBalancerId());
+						}
+						
+						healthChecks.add(healthCheck);
+					}
+				}
+				return healthChecks;
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+		
+		private String mapHostFromMethod(String method) {
+			if (method.split("|")[0].equals("http")) {
+				return method.split("|")[2];
+			}
+			return null;
+		}
+		
+		private String mapPathFromMethod(String method) {
+			if (method.split("|")[0].equals("http")) {
+				return method.split("|")[1];
+			}
+			return null;
+		}
+		
+		private HCProtocol mapProtocolFromMethod(String method) {
+			if (method != null) {
+				if (method.split("|")[0].equals("tcp")) {
+					return HCProtocol.TCP;
+				} else if (method.split("|")[0].equals("http")) {
+					return HCProtocol.HTTP;
+				} 
+			}
+			return null;
+		}
+	}
+	
+	private class QingCloudLbListenerBackend {
+		private String backendId;
+		private String backendName;
+		private int port;
+		private int weight;
+		private String resourceId;
+		private String createTime;
+		public QingCloudLbListenerBackend(String backendId, String backendName, int port, int weight, String resourceId, String createTime) {
+			this.backendId = backendId;
+			this.backendName = backendName;
+			this.port = port;
+			this.weight = weight;
+			this.resourceId = resourceId;
+			this.createTime = createTime;
+		}
+		public String getBackendId() {
+			return backendId;
+		}
+		public String getBackendName() {
+			return backendName;
+		}
+		public int getPort() {
+			return port;
+		}
+		public int getWeight() {
+			return weight;
+		}
+		public String getResourceId() {
+			return resourceId;
+		}
+		public String getCreateTime() {
+			return createTime;
+		}
+	}
+	
+	private class QingCloudLbListener {
+		
+		private String listenerId;
+		private String loadBalancerId;
+		private LbListener lbListener;
+		private List<QingCloudLbListenerBackend> backends;
+		public String getListenerId() {
+			return listenerId;
+		}
+		public LbListener getLbListener() {
+			return lbListener;
+		}
+		public String getLoadBalancerId() {
+			return this.loadBalancerId;
+		}
+		public List<QingCloudLbListenerBackend> getBackends() {
+			return this.backends;
+		}
+		private QingCloudLbListener(String listenerId, LbListener lbListener) {
+			this.listenerId = listenerId;
+			this.lbListener = lbListener;
+		}
+		public QingCloudLbListener(String listenerId, LbAlgorithm algorithm, String persistenceCookie, LbProtocol protocol, int publicPort, int privatePort) {
+			this(listenerId, LbListener.getInstance(algorithm, persistenceCookie, protocol, publicPort, privatePort));
+		}
+		public void addBackends(QingCloudLbListenerBackend backend) {
+			if (backends == null) {
+				backends = new ArrayList<QingCloudLbListenerBackend>();
+			}
+			backends.add(backend);
+		}
+		public void withLoadBalancer(String loadBalancerId) {
+			this.loadBalancerId = loadBalancerId;
+		}
+	}
+	
+	private class LoadBalancerListenersMapper extends QingCloudDriverToCoreMapper<DescribeLoadBalancerListenersResponseModel, List<QingCloudLbListener>> {
+		
+		@Override
+		protected List<QingCloudLbListener> doMapFrom(
+				DescribeLoadBalancerListenersResponseModel responseModel) {
+			try {
+				List<QingCloudLbListener> listeners = new ArrayList<QingCloudLbListener>();
+				if (responseModel != null && responseModel.getLoadbalancerListenerSet() != null) {
+					for (DescribeLoadBalancerListenersResponseItemModel item : responseModel.getLoadbalancerListenerSet()) {
+						QingCloudLbListener listener = new QingCloudLbListener(
+							item.getLoadBalancerListenerId(),
+							mapAlgorithmFromBalanceMode(item.getBalanceMode()), 
+							mapCookieFromSessionSticky(item.getSessionSticky()), 
+							mapProtocolFromListenerProtocol(item.getListenerProtocol()), 
+							item.getListenerPort(), 
+							item.getListenerPort());
+						String loadBalancerId = null;
+						if (item.getBackends() != null && item.getBackends().size() > 0) {
+							for (DescribeLoadBalancerListenerBackends backend : item.getBackends()) {
+								listener.addBackends(new QingCloudLbListenerBackend(
+										backend.getLoadbalancerBackendId(), 
+										backend.getLoadbalancerBackendName(), 
+										backend.getPort(),
+										backend.getWeight(),
+										backend.getResourceId(), 
+										backend.getCreate_time()));
+								if (loadBalancerId == null) {
+									loadBalancerId = backend.getLoadbalancerId();
+								}
+							}
+						}
+						listener.withLoadBalancer(loadBalancerId);
+					}
+				}
+				return listeners;
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+		
+		private LbAlgorithm mapAlgorithmFromBalanceMode(String mode) {
+			if (mode != null) {
+				if (mode.equals("roundrobin")) {
+					return LbAlgorithm.ROUND_ROBIN;
+				} else if (mode.equals("leastconn ")) {
+					return LbAlgorithm.LEAST_CONN;
+				} else if (mode.equals("source")) {
+					return LbAlgorithm.SOURCE;
+				}
+			}
+			return null;
+		}
+		
+		private String mapCookieFromSessionSticky(String sessionSticky) {
+			if (sessionSticky != null) {
+				if (sessionSticky.split("|")[0].equals("prefix")) {
+					return sessionSticky.split("|")[1];
+				}
+			}
+			return null;
+		}
+		
+		private LbProtocol mapProtocolFromListenerProtocol(String protocol) {
+			if (protocol != null) {
+				if (protocol.equals("http")) {
+					return LbProtocol.HTTP;
+				} else if (protocol.equals("https")) {
+					return LbProtocol.HTTPS;
+				} else if (protocol.equals("tcp")) {
+					return LbProtocol.RAW_TCP;
+				}
+			}
+			return null;
+		}
 	}
 	
 	private class LoadBalancersMapper extends QingCloudDriverToCoreMapper<DescribeLoadBalancersResponseModel, List<LoadBalancer>> {
@@ -600,11 +1150,11 @@ public class QingCloudLoadBalancer extends
 				if (responseModel != null && responseModel.getLoadbalancerSet() != null && responseModel.getLoadbalancerSet().size() > 0) {
 					for (DescribeLoadBalancersResponseItemModel item : responseModel.getLoadbalancerSet()) {
 						
-						List<DescribeLoadBalancerListenersResponseItemModel> response = listListeners(item.getLoadbalancerId());
+						List<QingCloudLbListener> response = listListeners(item.getLoadbalancerId());
 						int[] ports = new int[response.size()];
 						for (int i = 0; i < response.size(); i++) {
-							DescribeLoadBalancerListenersResponseItemModel listenerItem = response.get(i);
-							ports[i] = listenerItem.getListenerPort();
+							QingCloudLbListener listenerItem = response.get(i);
+							ports[i] = listenerItem.getLbListener().getPublicPort();
 						}
 						loadBalancers.add(LoadBalancer.getInstance(
 								getContext().getAccountNumber(), 
