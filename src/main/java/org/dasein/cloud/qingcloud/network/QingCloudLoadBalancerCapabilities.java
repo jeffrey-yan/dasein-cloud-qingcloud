@@ -55,42 +55,36 @@ public class QingCloudLoadBalancerCapabilities extends
 	@Override
 	public LoadBalancerAddressType getAddressType() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		return LoadBalancerAddressType.IP;
 	}
 
 	@Override
 	public int getMaxPublicPorts() throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return 0;
+		return 255;
 	}
 
 	@Override
 	public int getMaxHealthCheckTimeout() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return 0;
+		return 300;
 	}
 
 	@Override
 	public int getMinHealthCheckTimeout() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return 0;
+		return 5;
 	}
 
 	@Override
 	public int getMaxHealthCheckInterval() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return 0;
+		return 60;
 	}
 
 	@Override
 	public int getMinHealthCheckInterval() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return 0;
+		return 2;
 	}
 
 	@Override
@@ -106,64 +100,55 @@ public class QingCloudLoadBalancerCapabilities extends
 	@Override
 	public boolean healthCheckRequiresLoadBalancer() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	@Override
 	public boolean healthCheckRequiresListener() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	@Override
 	public Requirement healthCheckRequiresName() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		return Requirement.NONE;
 	}
 
 	@Override
 	public Requirement healthCheckRequiresPort() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		return Requirement.NONE;
 	}
 
 	@Override
 	public Requirement identifyEndpointsOnCreateRequirement()
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		return Requirement.NONE;
 	}
 
 	@Override
 	public Requirement identifyListenersOnCreateRequirement()
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		return Requirement.NONE;
 	}
 
 	@Override
 	public Requirement identifyVlanOnCreateRequirement() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		return Requirement.NONE;
 	}
 
 	@Override
 	public Requirement identifyHealthCheckOnCreateRequirement()
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		return Requirement.NONE;
 	}
 
 	@Override
 	public boolean isAddressAssignedByProvider() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	@Override
@@ -181,8 +166,7 @@ public class QingCloudLoadBalancerCapabilities extends
 	@Override
 	public Iterable<LbEndpointType> listSupportedEndpointTypes()
 			throws CloudException, InternalException {
-		// TODO Auto-generated method stub
-		return null;
+		return Arrays.asList(LbEndpointType.IP); //TODO SUPPORT Vxnet/Subnet or IP
 	}
 
 	@Override
@@ -206,15 +190,13 @@ public class QingCloudLoadBalancerCapabilities extends
 	@Override
 	public boolean supportsAddingEndpoints() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	@Override
 	public boolean supportsMonitoring() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	@Override
@@ -226,7 +208,6 @@ public class QingCloudLoadBalancerCapabilities extends
 	@Override
 	public boolean supportsSslCertificateStore() throws CloudException,
 			InternalException {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
