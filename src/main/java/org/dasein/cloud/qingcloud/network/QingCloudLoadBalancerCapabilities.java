@@ -60,7 +60,7 @@ public class QingCloudLoadBalancerCapabilities extends
 
 	@Override
 	public int getMaxPublicPorts() throws CloudException, InternalException {
-		return 255;
+		return 65515; //65535 - 20
 	}
 
 	@Override
@@ -166,7 +166,8 @@ public class QingCloudLoadBalancerCapabilities extends
 	@Override
 	public Iterable<LbEndpointType> listSupportedEndpointTypes()
 			throws CloudException, InternalException {
-		return Arrays.asList(LbEndpointType.IP); //TODO SUPPORT Vxnet/Subnet or IP
+		return Arrays.asList(LbEndpointType.IP, LbEndpointType.VM); 
+		//TODO: Qingcloud also support to add subnet/vxnet as the backend
 	}
 
 	@Override
