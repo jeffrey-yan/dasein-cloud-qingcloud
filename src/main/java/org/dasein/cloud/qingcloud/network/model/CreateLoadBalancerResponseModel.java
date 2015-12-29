@@ -30,16 +30,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @author Jane Wang
  * @since 2016.02.1
  */
-public class CreateSecurityGroupResponseModel extends ResponseModel {
+public class CreateLoadBalancerResponseModel extends ResponseModel {
 
-	@JsonProperty("security_group_id")
-	private String securityGroupId;
+	@JsonProperty("loadbalancer_id")
+	private String loadbalancerId;
 
-	public String getSecurityGroupId() {
-		return securityGroupId;
+	public String getLoadbalancerId() {
+		return loadbalancerId;
 	}
 
-	public void setSecurityGroupId(String securityGroupId) {
-		this.securityGroupId = securityGroupId;
+	public void setLoadbalancerId(String loadbalancerId) {
+		this.loadbalancerId = loadbalancerId;
 	}
 }

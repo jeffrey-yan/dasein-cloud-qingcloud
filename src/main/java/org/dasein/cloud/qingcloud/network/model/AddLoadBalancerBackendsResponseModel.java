@@ -20,26 +20,28 @@
  */
 package org.dasein.cloud.qingcloud.network.model;
 
+import java.util.List;
+
 import org.dasein.cloud.qingcloud.model.ResponseModel;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Created by Jane Wang on 12/17/2015.
+ * Created by Jane Wang on 12/18/2015.
  *
  * @author Jane Wang
  * @since 2016.02.1
  */
-public class CreateSecurityGroupResponseModel extends ResponseModel {
+public class AddLoadBalancerBackendsResponseModel extends ResponseModel {
 
-	@JsonProperty("security_group_id")
-	private String securityGroupId;
+	@JsonProperty("loadbalancer_backends")
+	private List<String> loadbalancerBackends;
 
-	public String getSecurityGroupId() {
-		return securityGroupId;
+	public List<String> getLoadbalancerBackends() {
+		return loadbalancerBackends;
 	}
 
-	public void setSecurityGroupId(String securityGroupId) {
-		this.securityGroupId = securityGroupId;
+	public void setLoadbalancerBackends(List<String> loadbalancerBackends) {
+		this.loadbalancerBackends = loadbalancerBackends;
 	}
 }

@@ -25,21 +25,21 @@ import org.dasein.cloud.qingcloud.model.ResponseModel;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Created by Jane Wang on 12/17/2015.
+ * Created by Jane Wang on 12/28/2015.
  *
  * @author Jane Wang
  * @since 2016.02.1
  */
-public class CreateSecurityGroupResponseModel extends ResponseModel {
+public class CreateServerCertificateResponseModel extends ResponseModel {
 
-	@JsonProperty("security_group_id")
-	private String securityGroupId;
+	@JsonProperty("server_certificate_id")
+	private String serverCertificateId;
 
-	public String getSecurityGroupId() {
-		return securityGroupId;
+	public String getServerCertificateId() {
+		return serverCertificateId;
 	}
 
-	public void setSecurityGroupId(String securityGroupId) {
-		this.securityGroupId = securityGroupId;
+	public void setServerCertificateId(String serverCertificateId) {
+		this.serverCertificateId = serverCertificateId;
 	}
 }

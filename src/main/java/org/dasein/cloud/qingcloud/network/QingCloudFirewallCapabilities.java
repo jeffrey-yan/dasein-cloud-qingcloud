@@ -1,3 +1,23 @@
+/*
+ *  *
+ *  Copyright (C) 2009-2015 Dell, Inc.
+ *  See annotations for authorship information
+ *
+ *  ====================================================================
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *  ====================================================================
+ *
+ */
 package org.dasein.cloud.qingcloud.network;
 
 import java.util.Arrays;
@@ -17,6 +37,12 @@ import org.dasein.cloud.network.RuleTargetType;
 import org.dasein.cloud.qingcloud.QingCloud;
 import org.dasein.cloud.util.NamingConstraints;
 
+/**
+ * Created by Jane Wang on 12/16/2015.
+ *
+ * @author Jane Wang
+ * @since 2016.02.1
+ */
 public class QingCloudFirewallCapabilities extends AbstractCapabilities<QingCloud> implements FirewallCapabilities {
 
 	public QingCloudFirewallCapabilities(QingCloud provider) {
@@ -61,7 +87,7 @@ public class QingCloudFirewallCapabilities extends AbstractCapabilities<QingClou
 	public Iterable<RuleTargetType> listSupportedDestinationTypes(
 			boolean inVlan, Direction direction) throws InternalException,
 			CloudException {
-		return Arrays.asList(RuleTargetType.VM, RuleTargetType.VLAN, RuleTargetType.CIDR);
+		return Arrays.asList(RuleTargetType.CIDR, RuleTargetType.GLOBAL);
 	}
 
 	@Override
@@ -91,7 +117,7 @@ public class QingCloudFirewallCapabilities extends AbstractCapabilities<QingClou
 	@Override
 	public Iterable<RuleTargetType> listSupportedSourceTypes(boolean inVlan,
 			Direction direction) throws InternalException, CloudException {
-		return Arrays.asList(RuleTargetType.VM, RuleTargetType.VLAN, RuleTargetType.CIDR);
+		return Arrays.asList(RuleTargetType.CIDR, RuleTargetType.GLOBAL);
 	}
 
 	@Override
@@ -102,7 +128,7 @@ public class QingCloudFirewallCapabilities extends AbstractCapabilities<QingClou
 
 	@Override
 	public Requirement requiresVLAN() throws CloudException, InternalException {
-		return Requirement.NONE;
+		return Requirement.OPTIONAL;
 	}
 
 	@Override
