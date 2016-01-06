@@ -1,3 +1,23 @@
+/*
+ *  *
+ *  Copyright (C) 2009-2015 Dell, Inc.
+ *  See annotations for authorship information
+ *
+ *  ====================================================================
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *  ====================================================================
+ *
+ */
 package org.dasein.cloud.qingcloud.network;
 
 import java.util.ArrayList;
@@ -19,7 +39,6 @@ import org.dasein.cloud.network.NetworkFirewallSupport;
 import org.dasein.cloud.network.Permission;
 import org.dasein.cloud.network.Protocol;
 import org.dasein.cloud.network.RuleTarget;
-import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.qingcloud.QingCloud;
 import org.dasein.cloud.qingcloud.model.ResponseModel;
 import org.dasein.cloud.qingcloud.model.SimpleJobResponseModel;
@@ -37,10 +56,45 @@ import org.dasein.cloud.qingcloud.util.requester.QingCloudRequester;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.requester.fluent.Requester;
 
+/**
+ * Created by Jane Wang on 01/06/2016.
+ *
+ * @author Jane Wang
+ * @since 2016.02.1
+ */
 public class QingCloudNetworkFirewall extends
 		AbstractNetworkFirewallSupport<QingCloud> implements NetworkFirewallSupport {
 
 	private static final Integer DefaultResponseDataLimit = 999;
+	
+	private class NetworkFirewallRuleIdGenerator {
+		
+		private String firewallId;
+		private String firewallRuleId;
+		
+		public NetworkFirewallRuleIdGenerator(String firewallId, String firewallRuleId) {
+			this.firewallId = firewallId;
+			this.firewallRuleId = firewallRuleId;
+		}
+		public NetworkFirewallRuleIdGenerator(String generatedId) {
+			if (generatedId != null && generatedId.split("|").length == 2) {
+				String[] generatedIdSegments = generatedId.split("|");
+				this.firewallId = generatedIdSegments[0];
+				this.firewallRuleId = generatedIdSegments[1];
+			}
+		}
+		
+		public String getFirewallId() {
+			return firewallId;
+		}
+		public String getFirewallRuleId() {
+			return firewallRuleId;
+		}
+		
+		public String toString() {
+			return this.firewallId + "|" + this.firewallRuleId;
+		}
+	}
 	
 	protected QingCloudNetworkFirewall(QingCloud provider) {
 		super(provider);
@@ -83,8 +137,8 @@ public class QingCloudNetworkFirewall extends
 				throw new InternalException("Authorize firewall rule failed!");
 			}
 		
-			applySecurityGroup(response.getSecurityGroupRules().get(0));
-			return response.getSecurityGroupRules().get(0);
+			applySecurityGroup(firewallId);
+			return new NetworkFirewallRuleIdGenerator(firewallId, response.getSecurityGroupRules().get(0)).toString();
 		} finally {
 			APITrace.end();
 		}
@@ -94,7 +148,7 @@ public class QingCloudNetworkFirewall extends
 	public String createFirewall(FirewallCreateOptions options)
 			throws InternalException, CloudException {
 		
-		APITrace.begin(getProvider(), "QingCloudNetworkFirewall.create");
+		APITrace.begin(getProvider(), "QingCloudNetworkFirewall.createFirewall");
 		try {
 		
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("CreateSecurityGroup");
@@ -258,8 +312,14 @@ public class QingCloudNetworkFirewall extends
 			CloudException {
 		APITrace.begin(getProvider(), "QingCloudNetworkFirewall.revoke");
 		try {
+			if (providerFirewallRuleId == null) {
+				throw new InternalException("revoke: firewall rule id cannot be null");
+			}
+			
+			NetworkFirewallRuleIdGenerator generator = new NetworkFirewallRuleIdGenerator(providerFirewallRuleId);
+			
 			QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("DeleteSecurityGroupRules");
-			requestBuilder.parameter("security_group_rules.1", providerFirewallRuleId);
+			requestBuilder.parameter("security_group_rules.1", generator.getFirewallRuleId());
 			requestBuilder.parameter("zone", getProviderDataCenterId());
 			Requester<DeleteSecurityGroupRulesResponseModel> requester = new QingCloudRequester<DeleteSecurityGroupRulesResponseModel, DeleteSecurityGroupRulesResponseModel>(
 	        		getProvider(), 
@@ -270,6 +330,8 @@ public class QingCloudNetworkFirewall extends
 					response.getSecurityGroupRules().size() == 0 || !response.getSecurityGroupRules().get(0).equals(providerFirewallRuleId)) {
 				throw new InternalException("Revoke firewall rule " + providerFirewallRuleId + " failed!");
 			}
+			
+			applySecurityGroup(generator.getFirewallId());
 		} finally {
 			APITrace.end();
 		}
@@ -293,10 +355,10 @@ public class QingCloudNetworkFirewall extends
         return dataCenters.iterator().next().getProviderDataCenterId();//each account has one DC in each region
 	}
 	
-	private void applySecurityGroup(String securityGroupId) 
+	private void applySecurityGroup(String firewallId) 
 			throws InternalException, CloudException {
 		QingCloudRequestBuilder requestBuilder = QingCloudRequestBuilder.get(getProvider()).action("ApplySecurityGroup");
-		requestBuilder.parameter("security_group", securityGroupId);
+		requestBuilder.parameter("security_group", firewallId);
 		requestBuilder.parameter("zone", getProviderDataCenterId());
 		Requester<SimpleJobResponseModel> requester = new QingCloudRequester<SimpleJobResponseModel, SimpleJobResponseModel>(
         		getProvider(), 
@@ -320,13 +382,13 @@ public class QingCloudNetworkFirewall extends
 						firewall.setDescription(item.getDescription());
 						firewall.setName(item.getSecurityGroupName());
 						firewall.setProviderFirewallId(item.getSecurityGroupId());
-						if (item.getResources() != null) {
-							if (item.getResources().get("resource_type").equals("router")) {
-								firewall.setProviderVlanId(item.getResources().get("resource_id").toString());
-								firewall.setSubnetAssociations((String[]) mapFromSubnets(getProvider().getNetworkServices().getVlanSupport().listSubnets(
-										item.getResources().get("resource_id").toString())).toArray());
-							}
-						}
+//						if (item.getResources() != null) {
+//							if (item.getResources().get("resource_type").equals("router")) {
+//								firewall.setProviderVlanId(item.getResources().get("resource_id").toString());
+//								firewall.setSubnetAssociations((String[]) mapFromSubnets(getProvider().getNetworkServices().getVlanSupport().listSubnets(
+//										item.getResources().get("resource_id").toString())).toArray());
+//							}
+//						}
 						firewall.setRegionId(getContext().getRegionId());
 						firewall.setVisibleScope(VisibleScope.ACCOUNT_DATACENTER);
 						firewall.setRules(mapFromFirewallRules(listRules(firewall.getProviderFirewallId())));
@@ -350,16 +412,16 @@ public class QingCloudNetworkFirewall extends
 			return rules;
 		}
 		
-		private List<String> mapFromSubnets(Iterable<Subnet> iterable) {
-			List<String> subnets = null;
-			for (Subnet subnet : iterable) {
-				if (subnets == null) {
-					subnets = new ArrayList<String>();
-				}
-				subnets.add(subnet.getProviderSubnetId());
-			}
-			return subnets;
-		}
+//		private List<String> mapFromSubnets(Iterable<Subnet> iterable) {
+//			List<String> subnets = null;
+//			for (Subnet subnet : iterable) {
+//				if (subnets == null) {
+//					subnets = new ArrayList<String>();
+//				}
+//				subnets.add(subnet.getProviderSubnetId());
+//			}
+//			return subnets;
+//		}
 	}
 	
 	private class FirewallRulesMapper extends QingCloudDriverToCoreMapper<DescribeSecurityGroupRulesResponseModel, List<FirewallRule>> {
@@ -371,7 +433,8 @@ public class QingCloudNetworkFirewall extends
 				if (responseModel != null && responseModel.getSecurityGroupRuleSet() != null && responseModel.getSecurityGroupRuleSet().size() > 0) {
 					for (DescribeSecurityGroupRulesResponseItemModel item : responseModel.getSecurityGroupRuleSet()) {
 						Protocol protocol = mapFromProtocol(item.getProtocol());
-						FirewallRule rule = FirewallRule.getInstance(item.getSecurityGroupRuleId(), 
+						FirewallRule rule = FirewallRule.getInstance(
+								new NetworkFirewallRuleIdGenerator(item.getSecurityGroupId(), item.getSecurityGroupRuleId()).toString(), 
 								item.getSecurityGroupId(),  
 								mapFromVal3OrSecurityGroupId(item.getVal3(), item.getSecurityGroupId()), 
 								mapFromDirection(item.getDirection()), 
