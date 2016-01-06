@@ -39,7 +39,7 @@ import org.dasein.cloud.qingcloud.QingCloud;
 public class QingCloudNetwork extends AbstractNetworkServices<QingCloud>
 		implements NetworkServices {
 
-	protected QingCloudNetwork(QingCloud provider) {
+	public QingCloudNetwork(QingCloud provider) {
 		super(provider);
 	}
 
