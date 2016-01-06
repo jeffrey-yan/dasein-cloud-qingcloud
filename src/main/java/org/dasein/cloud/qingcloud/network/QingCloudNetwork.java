@@ -26,6 +26,7 @@ import org.dasein.cloud.network.AbstractNetworkServices;
 import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.LoadBalancerSupport;
+import org.dasein.cloud.network.NetworkFirewallSupport;
 import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.qingcloud.QingCloud;
@@ -56,6 +57,11 @@ public class QingCloudNetwork extends AbstractNetworkServices<QingCloud>
 	@Override
 	public @Nullable FirewallSupport getFirewallSupport() {
 		return new QingCloudFirewall(getProvider());
+	}
+	
+	@Override
+	public @Nullable NetworkFirewallSupport getNetworkFirewallSupport() {
+		return new QingCloudNetworkFirewall(getProvider());
 	}
 
 	@Override
